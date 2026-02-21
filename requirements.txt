@@ -1,0 +1,3 @@
+# KnowledgeDigest v0.1.0
+# Nur Python stdlib -- keine externen Abhaengigkeiten
+# Benoetigt: Python >= 3.9 mit sqlite3 FTS5-Support
