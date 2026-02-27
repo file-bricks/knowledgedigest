@@ -2,23 +2,23 @@
 """
 KnowledgeDigest -- Haupt-Klasse.
 
-High-Level API fuer die Skill-Datenbank:
+High-Level API fuer die Wissensdatenbank:
     - index_skills(bach_db_path) -- BACH Skills einlesen und indexieren
-    - search(query) -- FTS5-basierte Suche ueber indexierte Skills
-    - get_skill(skill_name) -- Einzelnen Skill abrufen
-    - get_status() -- Index-Status
-
-Standalone-faehig: Funktioniert ohne BACH-Installation.
-Nur stdlib (sqlite3, re, pathlib, hashlib).
+    - index_wikis(bach_db_path)  -- BACH Wikis einlesen und indexieren
+    - ingest(path)               -- Dokumente verarbeiten (PDF/DOCX/TXT/MD/HTML)
+    - summarize(limit)           -- LLM-Zusammenfassungen generieren (Haiku)
+    - search(query)              -- FTS5-Suche ueber Skills
+    - search_wikis(query)        -- FTS5-Suche ueber Wikis
+    - search_all(query)          -- Unified Search ueber alles
+    - get_status()               -- Index-Status
 
 Usage:
     from KnowledgeDigest import KnowledgeDigest
 
     kd = KnowledgeDigest()
-    kd.index_skills("/path/to/bach.db")
-    results = kd.search("agent entwickler")
-    for r in results:
-        print(r['skill_name'], r['snippet'])
+    kd.ingest("/path/to/documents/")
+    kd.summarize(limit=10)
+    results = kd.search_all("machine learning")
 """
 
 __all__ = ["KnowledgeDigest"]
@@ -30,6 +30,8 @@ from typing import List, Dict, Optional, Any
 from .schema import ensure_schema
 from .indexer import SkillIndexer
 from .wiki_indexer import WikiIndexer
+from .ingestor import DocumentIngestor
+from .summarizer import Summarizer
 
 # Default: knowledge.db im data/ Unterordner
 _DEFAULT_DB = Path(__file__).parent / "data" / "knowledge.db"
@@ -39,16 +41,17 @@ _DEFAULT_BACH_DB = Path(r"C:\Users\lukas\OneDrive\KI&AI\BACH_v2_vanilla\system\d
 
 
 class KnowledgeDigest:
-    """Skill-Datenbank mit FTS5-Suche.
+    """Wissensdatenbank mit FTS5-Suche und LLM-Summarization.
 
-    Indexiert BACH-Skills (935 Eintraege, davon 766 mit Content)
+    Indexiert BACH-Skills, Wiki-Artikel und ingested Dokumente
     in einer eigenen SQLite-DB. Chunked den Content fuer
     granulare Suche (~400 Token pro Chunk).
 
     Usage:
         kd = KnowledgeDigest()
-        stats = kd.index_skills()
-        results = kd.search("CRISPR")
+        kd.ingest("/path/to/docs/")
+        kd.summarize(limit=10)
+        results = kd.search_all("CRISPR")
     """
 
     def __init__(self, db_path: Optional[Path] = None):
@@ -61,6 +64,8 @@ class KnowledgeDigest:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._indexer = SkillIndexer(self.db_path)
         self._wiki_indexer = WikiIndexer(self.db_path)
+        self._ingestor = DocumentIngestor(self.db_path)
+        self._summarizer = Summarizer(self.db_path)
 
     def _get_conn(self) -> sqlite3.Connection:
         """Oeffnet DB-Connection mit Schema-Sicherstellung."""
@@ -382,19 +387,11 @@ class KnowledgeDigest:
     # ------------------------------------------------------------------
 
     def get_status(self) -> Dict[str, Any]:
-        """Gibt umfassende Index-Statistiken zurueck.
-
-        Returns:
-            {
-                'db_path': '/path/to/knowledge.db',
-                'db_size_kb': 1234,
-                'skills': {...},
-                'wikis': {...},
-                ...
-            }
-        """
+        """Gibt umfassende Index-Statistiken zurueck."""
         skill_status = self._indexer.get_index_status()
         wiki_status = self._wiki_indexer.get_index_status()
+        doc_status = self._ingestor.get_ingest_status()
+        queue_status = self._summarizer.get_queue_status()
 
         # DB-Groesse
         db_info = {}
@@ -409,12 +406,174 @@ class KnowledgeDigest:
             **db_info,
             'skills': skill_status,
             'wikis': wiki_status,
+            'documents': doc_status,
+            'queue': queue_status,
         }
 
     def close(self):
         """Schliesst alle offenen Connections."""
         self._indexer.close()
         self._wiki_indexer.close()
+        self._ingestor.close()
+        self._summarizer.close()
+
+    # ==================================================================
+    # DOCUMENT INGESTION
+    # ==================================================================
+
+    def ingest(self, path: str | Path, *,
+               archive: bool = True,
+               chunk_size: int = 350,
+               recursive: bool = False) -> Dict[str, Any]:
+        """Verarbeitet Dokumente (Dateien oder Ordner).
+
+        Args:
+            path: Datei oder Ordner
+            archive: Originale nach archive/ verschieben
+            chunk_size: Woerter pro Chunk
+            recursive: Unterordner mit einbeziehen
+
+        Returns:
+            Statistiken
+        """
+        p = Path(path)
+        if p.is_file():
+            return self._ingestor.ingest_file(
+                p, archive=archive, chunk_size=chunk_size
+            )
+        elif p.is_dir():
+            return self._ingestor.ingest_directory(
+                p, archive=archive, chunk_size=chunk_size, recursive=recursive
+            )
+        else:
+            return {'error': f'Pfad nicht gefunden: {path}'}
+
+    # ==================================================================
+    # LLM SUMMARIZATION
+    # ==================================================================
+
+    def summarize(self, *, limit: int = 10,
+                  delay: float = 0.5) -> Dict[str, Any]:
+        """Verarbeitet pending Queue-Items mit Haiku LLM.
+
+        Args:
+            limit: Maximale Queue-Items pro Durchlauf
+            delay: Pause zwischen API-Calls (Sekunden)
+
+        Returns:
+            Statistiken
+        """
+        return self._summarizer.summarize_queue(limit=limit, delay=delay)
+
+    def enqueue_all(self) -> Dict[str, int]:
+        """Erstellt Queue-Eintraege fuer alle Skills und Wikis."""
+        skills = self._summarizer.enqueue_skills()
+        wikis = self._summarizer.enqueue_wikis()
+        return {'skills_enqueued': skills, 'wikis_enqueued': wikis}
+
+    def get_queue_status(self) -> Dict[str, Any]:
+        """Queue-Statistiken."""
+        return self._summarizer.get_queue_status()
+
+    # ==================================================================
+    # UNIFIED SEARCH
+    # ==================================================================
+
+    def search_all(self, query: str, *, limit: int = 20) -> List[Dict[str, Any]]:
+        """Sucht ueber Skills, Wikis und Dokumente gleichzeitig.
+
+        Args:
+            query: Suchbegriff(e) -- FTS5-Syntax
+            limit: Maximale Ergebnisse pro Quelle
+
+        Returns:
+            Zusammengefuehrte und nach Relevanz sortierte Ergebnisse
+        """
+        results = []
+
+        # Skills durchsuchen
+        try:
+            skill_results = self.search(query, limit=limit)
+            for r in skill_results:
+                results.append({
+                    'source': 'skill',
+                    'name': r['skill_name'],
+                    'type': r.get('skill_type', ''),
+                    'snippet': r.get('snippet', ''),
+                    'relevance': r.get('relevance', 0),
+                    'word_count': r.get('word_count', 0),
+                })
+        except Exception:
+            pass
+
+        # Wikis durchsuchen
+        try:
+            wiki_results = self.search_wikis(query, limit=limit)
+            for r in wiki_results:
+                results.append({
+                    'source': 'wiki',
+                    'name': r.get('title', r.get('wiki_path', '')),
+                    'type': r.get('category', ''),
+                    'snippet': r.get('snippet', ''),
+                    'relevance': r.get('relevance', 0),
+                    'word_count': r.get('word_count', 0),
+                })
+        except Exception:
+            pass
+
+        # Dokumente durchsuchen
+        try:
+            doc_results = self._search_documents(query, limit=limit)
+            results.extend(doc_results)
+        except Exception:
+            pass
+
+        # Nach Relevanz sortieren (niedrigerer BM25-Rank = besser)
+        results.sort(key=lambda x: x.get('relevance', 0))
+
+        return results[:limit]
+
+    def _search_documents(self, query: str, *,
+                          limit: int = 20) -> List[Dict[str, Any]]:
+        """FTS5-Suche ueber ingested Dokumente."""
+        conn = self._get_conn()
+        try:
+            rows = conn.execute("""
+                SELECT
+                    d.filename,
+                    d.file_type,
+                    d.word_count,
+                    dc.chunk_index,
+                    snippet(document_fts, 1, '>>>', '<<<', '...', 30) as snippet,
+                    document_fts.rank as relevance
+                FROM document_fts
+                JOIN document_chunks dc ON document_fts.rowid = dc.id
+                JOIN documents d ON dc.doc_id = d.id
+                WHERE document_fts MATCH ?
+                ORDER BY document_fts.rank
+                LIMIT ?
+            """, (query, limit)).fetchall()
+
+            results = []
+            seen = set()
+            for row in rows:
+                name = row['filename']
+                if name in seen:
+                    continue
+                seen.add(name)
+                results.append({
+                    'source': 'document',
+                    'name': name,
+                    'type': row['file_type'],
+                    'snippet': row['snippet'],
+                    'relevance': row['relevance'],
+                    'word_count': row['word_count'],
+                })
+            return results
+        except Exception:
+            return []
+        finally:
+            conn.close()
 
     # ==================================================================
     # WIKI-ARTIKEL INDEXIERUNG
@@ -722,25 +881,29 @@ def main():
     import sys
 
     parser = argparse.ArgumentParser(
-        description="KnowledgeDigest -- BACH Skill- und Wiki-Datenbank",
+        description="KnowledgeDigest -- Wissensdatenbank mit LLM-Summarization",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\
-Beispiele (Skills):
+Ingestion & Summarization:
+  python -m KnowledgeDigest ingest data/inbox/       # Dokumente verarbeiten
+  python -m KnowledgeDigest ingest document.pdf      # Einzeldatei
+  python -m KnowledgeDigest summarize --limit 10     # Queue abarbeiten (Haiku)
+  python -m KnowledgeDigest enqueue                  # Skills+Wikis in Queue
+  python -m KnowledgeDigest queue                    # Queue-Status
+
+Unified Search:
+  python -m KnowledgeDigest search-all "topic"       # Skills+Wikis+Docs
+
+Skills:
   python -m KnowledgeDigest index                    # Skills indexieren
   python -m KnowledgeDigest search "agent"           # Skill-Suche
-  python -m KnowledgeDigest get entwickler            # Skill-Details
-  python -m KnowledgeDigest keywords agent           # Skill-Keyword-Suche
-  python -m KnowledgeDigest list --type agent        # Skills auflisten
 
-Beispiele (Wikis):
+Wikis:
   python -m KnowledgeDigest index-wikis              # Wikis indexieren
   python -m KnowledgeDigest search-wikis "ollama"    # Wiki-Suche
-  python -m KnowledgeDigest get-wiki help/wiki/ollama.txt  # Wiki-Details
-  python -m KnowledgeDigest wiki-keywords ollama     # Wiki-Keyword-Suche
-  python -m KnowledgeDigest list-wikis               # Wikis auflisten
 
 Status:
-  python -m KnowledgeDigest status                   # Index-Status
+  python -m KnowledgeDigest status                   # Gesamtstatus
 """
     )
 
@@ -806,6 +969,31 @@ Status:
     ls_w = sub.add_parser("list-wikis", help="Wiki-Artikel auflisten")
     ls_w.add_argument("--category", "-c", help="Kategorie filtern")
     ls_w.add_argument("--limit", "-l", type=int, default=50)
+
+    # ========== INGESTION & SUMMARIZATION ==========
+
+    # ingest
+    ing = sub.add_parser("ingest", help="Dokumente verarbeiten")
+    ing.add_argument("path", nargs="?", help="Datei oder Ordner (Default: data/inbox/)")
+    ing.add_argument("--no-archive", action="store_true", help="Originale nicht verschieben")
+    ing.add_argument("--recursive", "-r", action="store_true", help="Unterordner einbeziehen")
+    ing.add_argument("--chunk-size", type=int, default=350, help="Woerter pro Chunk")
+
+    # summarize
+    summ = sub.add_parser("summarize", help="LLM-Summarization (Haiku)")
+    summ.add_argument("--limit", "-l", type=int, default=10, help="Max Queue-Items")
+    summ.add_argument("--delay", type=float, default=0.5, help="Pause zwischen Calls (s)")
+
+    # enqueue
+    sub.add_parser("enqueue", help="Skills+Wikis in Summarization-Queue")
+
+    # queue
+    sub.add_parser("queue", help="Queue-Status anzeigen")
+
+    # search-all
+    sa = sub.add_parser("search-all", help="Unified Search (Skills+Wikis+Docs)")
+    sa.add_argument("query")
+    sa.add_argument("--limit", "-l", type=int, default=20)
 
     args = parser.parse_args()
     kd = KnowledgeDigest()
@@ -923,6 +1111,68 @@ Status:
             cat = f"[{r['category']}]" if r['category'] else ""
             print(f"  {cat} {r['title']}{chunks_info}")
             print(f"    {r['wiki_path']}")
+
+    # ========== INGESTION & SUMMARIZATION ==========
+
+    elif args.cmd == "ingest":
+        path = Path(args.path) if args.path else None
+        if path:
+            result = kd.ingest(
+                path, archive=not args.no_archive,
+                chunk_size=args.chunk_size, recursive=args.recursive,
+            )
+        else:
+            # Default: data/inbox/
+            result = kd.ingest(
+                _DEFAULT_DB.parent / "inbox",
+                archive=not args.no_archive,
+                chunk_size=args.chunk_size, recursive=args.recursive,
+            )
+        if isinstance(result, dict) and 'files' in result:
+            # Directory result
+            print(f"Verarbeitet: {result.get('ingested', 0)} | "
+                  f"Uebersprungen: {result.get('skipped', 0)} | "
+                  f"Fehler: {result.get('errors', 0)}")
+            print(f"Chunks: {result.get('total_chunks', 0)} | "
+                  f"Woerter: {result.get('total_words', 0)} | "
+                  f"Dauer: {result.get('duration_ms', 0)}ms")
+            if result.get('errors', 0) > 0:
+                for f in result['files']:
+                    if f['status'] == 'error':
+                        print(f"  FEHLER: {f['filename']}: {f['error']}")
+        else:
+            print(json.dumps(result, indent=2, ensure_ascii=False))
+
+    elif args.cmd == "summarize":
+        result = kd.summarize(limit=args.limit, delay=args.delay)
+        print(f"Verarbeitet: {result.get('processed', 0)} | "
+              f"Fehler: {result.get('errors', 0)} | "
+              f"Dauer: {result.get('duration_ms', 0)}ms")
+        print(f"Tokens: {result.get('total_input_tokens', 0)} in / "
+              f"{result.get('total_output_tokens', 0)} out | "
+              f"Kosten: ~${result.get('estimated_cost_usd', 0)}")
+
+    elif args.cmd == "enqueue":
+        result = kd.enqueue_all()
+        print(f"Skills enqueued: {result['skills_enqueued']}")
+        print(f"Wikis enqueued: {result['wikis_enqueued']}")
+
+    elif args.cmd == "queue":
+        status = kd.get_queue_status()
+        print(json.dumps(status, indent=2, ensure_ascii=False))
+
+    elif args.cmd == "search-all":
+        results = kd.search_all(args.query, limit=args.limit)
+        if not results:
+            print("Keine Treffer.")
+        for r in results:
+            src = r.get('source', '?')
+            name = r.get('name', '?')
+            typ = r.get('type', '')
+            print(f"  [{src}] {name}" + (f" ({typ})" if typ else ""))
+            if r.get('snippet'):
+                print(f"    {r['snippet'][:120]}")
+            print()
 
     else:
         parser.print_help()

@@ -5,11 +5,12 @@ KnowledgeDigest -- DB-Schema Definition + Migration.
 Eigene SQLite-DB (knowledge.db) fuer indexierte BACH-Skills.
 NICHT in bach.db schreiben!
 
-Schema-Design:
-    skill_index  -- Metadaten pro Skill (1:1 mit BACH skills)
-    skill_chunks -- Gechunkte Textabschnitte (1:N pro Skill)
-    skill_fts    -- FTS5 Volltextindex ueber Chunks
-    skill_keywords -- Extrahierte Schluesselwoerter (1:N pro Skill)
+Schema-Design v3:
+    skill_index / skill_chunks / skill_fts / skill_keywords  -- BACH Skills
+    wiki_index / wiki_chunks / wiki_fts / wiki_keywords      -- BACH Wikis
+    documents / document_chunks / document_fts / document_keywords -- Ingested Docs
+    summaries     -- LLM-Zusammenfassungen (quelluebergreifend)
+    digest_queue  -- Processing Queue
 
 Entscheidung: Normalisiertes Schema statt flache skill_knowledge Tabelle,
 weil FTS5 ueber einzelne Chunks performanter ist als ueber JSON-Blobs.
@@ -20,7 +21,7 @@ __all__ = ["SCHEMA_SQL", "SCHEMA_VERSION", "ensure_schema", "get_schema_version"
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 SCHEMA_SQL = """
 -- ========================================================================
@@ -150,6 +151,105 @@ CREATE TABLE IF NOT EXISTS wiki_keywords (
 );
 
 -- ========================================================================
+-- DOCUMENTS (Ingested Dateien: PDF, DOCX, TXT, MD, HTML)
+-- ========================================================================
+
+-- Dokument-Metadaten (1 Zeile pro ingesteter Datei)
+CREATE TABLE IF NOT EXISTS documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_path TEXT UNIQUE NOT NULL,
+    filename TEXT NOT NULL,
+    file_type TEXT NOT NULL,
+    file_size INTEGER DEFAULT 0,
+    content_hash TEXT,
+    language TEXT,
+    word_count INTEGER DEFAULT 0,
+    chunk_count INTEGER DEFAULT 0,
+    page_count INTEGER DEFAULT 0,
+    extraction_method TEXT,
+    ingested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    archived_path TEXT,
+    source_dir TEXT
+);
+
+-- Gechunkte Textabschnitte (N Zeilen pro Dokument)
+CREATE TABLE IF NOT EXISTS document_chunks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    doc_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    chunk_index INTEGER NOT NULL,
+    content TEXT NOT NULL,
+    token_count INTEGER DEFAULT 0,
+    UNIQUE(doc_id, chunk_index)
+);
+
+-- FTS5 Volltextindex ueber Document-Chunks
+CREATE VIRTUAL TABLE IF NOT EXISTS document_fts USING fts5(
+    filename,
+    content,
+    tokenize='unicode61'
+);
+
+-- Trigger: document_chunks -> document_fts sync
+CREATE TRIGGER IF NOT EXISTS doc_chunk_ai AFTER INSERT ON document_chunks BEGIN
+    INSERT INTO document_fts(rowid, filename, content)
+    SELECT new.id,
+           (SELECT filename FROM documents WHERE id = new.doc_id),
+           new.content;
+END;
+
+CREATE TRIGGER IF NOT EXISTS doc_chunk_ad AFTER DELETE ON document_chunks BEGIN
+    INSERT INTO document_fts(document_fts, rowid, filename, content)
+    SELECT 'delete', old.id,
+           (SELECT filename FROM documents WHERE id = old.doc_id),
+           old.content;
+END;
+
+-- Schluesselwoerter pro Dokument
+CREATE TABLE IF NOT EXISTS document_keywords (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    doc_id INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    keyword TEXT NOT NULL,
+    source TEXT DEFAULT 'content',
+    UNIQUE(doc_id, keyword)
+);
+
+-- ========================================================================
+-- SUMMARIES (LLM-Zusammenfassungen, quelluebergreifend)
+-- ========================================================================
+
+CREATE TABLE IF NOT EXISTS summaries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_type TEXT NOT NULL,
+    source_id INTEGER NOT NULL,
+    chunk_index INTEGER NOT NULL,
+    summary TEXT NOT NULL,
+    keywords TEXT,
+    domain TEXT,
+    model TEXT,
+    input_tokens INTEGER DEFAULT 0,
+    output_tokens INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(source_type, source_id, chunk_index)
+);
+
+-- ========================================================================
+-- DIGEST QUEUE (Processing Pipeline)
+-- ========================================================================
+
+CREATE TABLE IF NOT EXISTS digest_queue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_type TEXT NOT NULL,
+    source_id INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    step TEXT DEFAULT 'summarize',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    started_at TIMESTAMP,
+    finished_at TIMESTAMP,
+    error_msg TEXT,
+    UNIQUE(source_type, source_id, step)
+);
+
+-- ========================================================================
 -- META
 -- ========================================================================
 
@@ -177,6 +277,20 @@ CREATE INDEX IF NOT EXISTS idx_wiki_modified ON wiki_index(last_modified);
 CREATE INDEX IF NOT EXISTS idx_wiki_chunk_wiki ON wiki_chunks(wiki_id);
 CREATE INDEX IF NOT EXISTS idx_wiki_keyword_wiki ON wiki_keywords(wiki_id);
 CREATE INDEX IF NOT EXISTS idx_wiki_keyword_text ON wiki_keywords(keyword);
+
+-- Documents
+CREATE INDEX IF NOT EXISTS idx_doc_type ON documents(file_type);
+CREATE INDEX IF NOT EXISTS idx_doc_hash ON documents(content_hash);
+CREATE INDEX IF NOT EXISTS idx_doc_chunk_doc ON document_chunks(doc_id);
+CREATE INDEX IF NOT EXISTS idx_doc_keyword_doc ON document_keywords(doc_id);
+CREATE INDEX IF NOT EXISTS idx_doc_keyword_text ON document_keywords(keyword);
+
+-- Summaries
+CREATE INDEX IF NOT EXISTS idx_summary_source ON summaries(source_type, source_id);
+
+-- Queue
+CREATE INDEX IF NOT EXISTS idx_queue_status ON digest_queue(status);
+CREATE INDEX IF NOT EXISTS idx_queue_source ON digest_queue(source_type, source_id);
 """
 
 
