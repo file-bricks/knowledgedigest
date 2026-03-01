@@ -1,16 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-KnowledgeDigest -- Skill-Datenbank mit FTS5-Suche.
+KnowledgeDigest -- Portable Wissensdatenbank.
 
-Indexiert BACH-Skills, chunked den Content und macht ihn
-durchsuchbar via FTS5-Volltextsuche.
+Indexiert Dokumente (PDF, DOCX, TXT, MD, HTML), chunked den Content
+und macht ihn durchsuchbar via FTS5-Volltextsuche.
 
 Usage:
     from KnowledgeDigest import KnowledgeDigest
 
     kd = KnowledgeDigest()
-    kd.index_skills("/path/to/bach.db")
-    results = kd.search("agent entwickler")
+    kd.add_directory("/path/to/docs")
+    kd.scan_directory("/path/to/docs")
+    results = kd.search_all("suchbegriff")
+
+    # GUI starten: python -m KnowledgeDigest --gui
+    # Web-Viewer:  python -m KnowledgeDigest --web
 
 Author: Lukas Geiger
 License: MIT
@@ -18,5 +22,5 @@ License: MIT
 
 from .digest import KnowledgeDigest
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 __all__ = ["KnowledgeDigest"]

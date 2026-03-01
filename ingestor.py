@@ -46,12 +46,16 @@ class DocumentIngestor:
         result = ing.ingest_directory(Path("inbox/"))
     """
 
-    def __init__(self, knowledge_db: Path):
+    def __init__(self, knowledge_db: Path, config=None):
         self.knowledge_db = knowledge_db
         self._conn: Optional[sqlite3.Connection] = None
         self._extractor = TextExtractor()
-        self.inbox_dir = _DATA_DIR / "inbox"
-        self.archive_dir = _DATA_DIR / "archive"
+        if config:
+            self.inbox_dir = config.get_inbox_dir()
+            self.archive_dir = config.get_archive_dir()
+        else:
+            self.inbox_dir = _DATA_DIR / "inbox"
+            self.archive_dir = _DATA_DIR / "archive"
 
     def _get_conn(self) -> sqlite3.Connection:
         """Lazy-init der DB-Connection mit Schema-Sicherstellung."""

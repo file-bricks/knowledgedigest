@@ -15,6 +15,7 @@ build/
 # Runtime data
 data/
 *.db
+knowledgedigest.json
 
 # Virtual Environment
 .venv/
