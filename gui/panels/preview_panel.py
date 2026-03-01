@@ -11,12 +11,12 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QTextEdit, QScrollArea,
     QStackedWidget, QPushButton, QHBoxLayout, QTabWidget
 )
-from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QPixmap, QImage
+from PySide6.QtCore import Qt, QSize
+from PySide6.QtGui import QPixmap, QImage
 
 
 class PreviewPanel(QWidget):

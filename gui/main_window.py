@@ -9,12 +9,12 @@ import os
 import threading
 from pathlib import Path
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QMainWindow, QSplitter, QToolBar, QStatusBar,
     QFileDialog, QMessageBox, QLabel
 )
-from PyQt6.QtCore import Qt, QSize, QTimer
-from PyQt6.QtGui import QAction
+from PySide6.QtCore import Qt, QSize, QTimer
+from PySide6.QtGui import QAction
 
 from .event_bus import EventBus, EventType, get_event_bus
 from .panels.directory_panel import DirectoryPanel

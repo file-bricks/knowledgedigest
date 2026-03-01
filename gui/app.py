@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 KnowledgeDigest -- GUI Application Entry Point.
-Startet die PyQt6-Anwendung mit Dark Theme.
+Startet die PySide6-Anwendung mit Dark Theme.
 """
 
 import sys
 from pathlib import Path
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtGui import QPalette, QColor
-from PyQt6.QtCore import Qt
+from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import QPalette, QColor
+from PySide6.QtCore import Qt
 
 
 def _apply_dark_palette(app: QApplication):

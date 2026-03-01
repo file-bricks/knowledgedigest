@@ -2,7 +2,7 @@
 
 A portable, self-contained knowledge database that indexes documents, chunks them,
 and makes them searchable via FTS5 full-text search. Optionally summarizes chunks
-with LLM (Haiku). Two frontends: **PyQt6 Desktop GUI** and **Web Viewer**.
+with LLM (Haiku). Two frontends: **PySide6 Desktop GUI** and **Web Viewer**.
 
 ## Quick Start
 
@@ -11,7 +11,7 @@ git clone https://github.com/lukisch/knowledgedigest
 cd knowledgedigest
 pip install -r requirements.txt
 
-# Desktop GUI (PyQt6, dark theme, 3-panel layout)
+# Desktop GUI (PySide6, dark theme, 3-panel layout)
 python -m KnowledgeDigest --gui
 
 # Web Viewer (stdlib-only, dark theme, localhost:8787)
@@ -51,7 +51,7 @@ Add directories via GUI or config
 ## Features
 
 - **Portable**: JSON config, no hardcoded paths. Copy the folder, it works.
-- **Two Frontends**: PyQt6 Desktop GUI + stdlib Web Viewer
+- **Two Frontends**: PySide6 Desktop GUI + stdlib Web Viewer
 - **FTS5 Search**: SQLite FTS5 with BM25 ranking and snippet highlighting
 - **Document Support**: PDF, DOCX, TXT, MD, HTML
 - **LLM Summarization** (optional): Haiku batch processing per chunk
@@ -145,7 +145,7 @@ zero impact when disabled.
 ## Requirements
 
 - Python 3.10+
-- PyQt6 (for GUI)
+- PySide6 (for GUI)
 - PyMuPDF (for PDF preview in GUI)
 - No additional dependencies for CLI or Web Viewer
 

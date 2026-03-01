@@ -5,11 +5,11 @@ Zeigt Dokumente als sortierbare Tabelle.
 Adaptiert von DokuZentrum (gui/panels/document_list.py).
 """
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QTableWidget, QTableWidgetItem,
     QHeaderView, QAbstractItemView
 )
-from PyQt6.QtCore import Qt
+from PySide6.QtCore import Qt
 
 from ..event_bus import EventType, get_event_bus
 

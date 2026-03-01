@@ -4,18 +4,18 @@ KnowledgeDigest -- Ingest Progress Dialog.
 Zeigt Fortschritt beim Indexieren.
 """
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QProgressBar, QLabel,
     QDialogButtonBox, QTextEdit
 )
-from PyQt6.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 
 
 class IngestWorker(QThread):
     """Worker-Thread fuer Dokument-Ingestion."""
-    progress = pyqtSignal(int, str)  # count, filename
-    finished = pyqtSignal(dict)      # result stats
-    error = pyqtSignal(str)
+    progress = Signal(int, str)  # count, filename
+    finished = Signal(dict)      # result stats
+    error = Signal(str)
 
     def __init__(self, kd, path, recursive=True, archive=False, chunk_size=350):
         super().__init__()

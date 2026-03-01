@@ -10,13 +10,13 @@ import subprocess
 import sys
 from pathlib import Path
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QTreeWidget, QTreeWidgetItem,
     QMenu, QMessageBox, QLabel, QHBoxLayout, QPushButton,
     QFileDialog
 )
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QAction
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QAction
 
 from ..event_bus import EventType, get_event_bus
 

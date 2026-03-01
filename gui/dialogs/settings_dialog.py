@@ -6,7 +6,7 @@ Adaptiert von DokuZentrum (gui/dialogs/settings_dialog.py).
 """
 
 from pathlib import Path
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QTabWidget, QWidget, QFormLayout,
     QLineEdit, QSpinBox, QCheckBox, QPushButton, QFileDialog,
     QDialogButtonBox, QHBoxLayout, QListWidget, QLabel

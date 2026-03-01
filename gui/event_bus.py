@@ -5,7 +5,7 @@ Zentrale Event-Verteilung zwischen GUI-Modulen.
 Adaptiert von LitZentrum (src/core/event_bus.py).
 """
 
-from PyQt6.QtCore import QObject, pyqtSignal
+from PySide6.QtCore import QObject, Signal
 from enum import Enum
 from typing import Any, Callable, Dict, List
 
@@ -42,7 +42,7 @@ class EventType(Enum):
 class EventBus(QObject):
     """Zentrale Event-Verteilung (Singleton)"""
 
-    event_fired = pyqtSignal(str, object)
+    event_fired = Signal(str, object)
 
     _instance = None
 
