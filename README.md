@@ -149,6 +149,20 @@ zero impact when disabled.
 - PyMuPDF (for PDF preview in GUI)
 - No additional dependencies for CLI or Web Viewer
 
+## See Also: ProFiler
+
+Need PDF encryption, OCR, anonymization, or file versioning? Check out [ProFiler](https://github.com/file-bricks/ProFiler) -- a professional file management suite from the same author.
+
+| | KnowledgeDigest | ProFiler |
+|---|---|---|
+| **Focus** | Knowledge search, chunking, LLM summaries | File management, PDF tools, OCR, privacy |
+| **Search** | FTS5 with BM25 ranking, snippet highlighting | Multi-DB, type/size/date filters |
+| **AI** | LLM summarization (Haiku), keyword extraction | -- |
+| **PDF** | Read-only (text extraction) | Encrypt, decrypt, extract, redact, OCR |
+| **Privacy** | -- | Anonymization, redaction, clipboard guard |
+| **Interfaces** | Desktop GUI, Web Viewer, CLI, Python API | Desktop GUI, System Tray |
+| **License** | MIT | AGPL v3 |
+
 ## License
 
 MIT License -- Copyright (c) 2026 Lukas Geiger
