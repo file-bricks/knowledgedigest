@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-KnowledgeDigest -- LLM Summarization via Anthropic Haiku.
+KnowledgeDigest -- LLM Summarization (Provider-Agnostic).
 
 Verarbeitet Chunks aus der digest_queue:
     - Pro Chunk: 3-5 Satz-Summary
@@ -8,70 +8,112 @@ Verarbeitet Chunks aus der digest_queue:
     - Domain/Topic-Klassifikation
     - Token-Tracking fuer Kosten
 
+Unterstuetzte Provider:
+    - anthropic: Claude Haiku (Default, benoetigt anthropic-Paket + API-Key)
+    - ollama: Lokales LLM via Ollama REST API (zero-dep, kostenlos)
+    - custom: Eigene Callback-Funktion
+
 Usage:
-    from KnowledgeDigest.summarizer import Summarizer
-    s = Summarizer(knowledge_db_path)
+    # Anthropic (Default)
+    s = Summarizer(knowledge_db_path, provider="anthropic")
+
+    # Ollama (lokal)
+    s = Summarizer(knowledge_db_path, provider="ollama",
+                   model="qwen3:4b", base_url="http://localhost:11434")
+
+    # Custom Provider
+    s = Summarizer(knowledge_db_path, provider="custom",
+                   llm_fn=my_llm_function)
+
     stats = s.summarize_queue(limit=10)
-    print(stats)
+
+Author: Lukas Geiger
+License: MIT
 """
 
 __all__ = ["Summarizer"]
 
 import json
 import os
+import re
 import sqlite3
 import time
+import urllib.request
+import urllib.error
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Callable
 
 from .schema import ensure_schema
 
-# Haiku Model-ID
-_MODEL = "claude-haiku-4-5-20251001"
-
 # System-Prompt fuer Summarization
 _SYSTEM_PROMPT = """\
-Du bist ein Wissens-Analyst. Analysiere den folgenden Textabschnitt und erstelle eine strukturierte Zusammenfassung.
+Du arbeitest in KnowledgeDigest, einer Wissensdatenbank. Deine einzige Aufgabe: Textabschnitte auf ihre Kernfakten reduzieren.
 
-Antworte AUSSCHLIESSLICH mit validem JSON in diesem Format:
-{
-    "summary": "3-5 Saetze die den Kerninhalt zusammenfassen",
-    "keywords": ["keyword1", "keyword2", "keyword3"],
-    "domain": "Hauptthema/Fachgebiet (z.B. 'Softwareentwicklung', 'Physik', 'Medizin')"
-}
+Du bekommst einen Textabschnitt (Chunk) aus einem Dokument. Extrahiere die wichtigsten Fakten und gib NUR dieses JSON zurueck:
 
-Regeln:
-- Summary: 3-5 praegnante Saetze, keine Aufzaehlungen
-- Keywords: 3-8 relevante Fachbegriffe
-- Domain: Ein einzelnes Wort oder kurzer Begriff
-- Sprache der Summary: gleiche Sprache wie der Input
-- NUR JSON ausgeben, kein Markdown, kein Text drumherum
+{"summary": "3-5 Saetze mit den Kernfakten", "keywords": ["fachbegriff1", "fachbegriff2"], "domain": "Fachgebiet"}
+
+Keine Erklaerungen, kein Markdown, kein Drumherum. Nur das JSON.
 """
+
+# Default Models per Provider
+_DEFAULT_MODELS = {
+    "anthropic": "claude-haiku-4-5-20251001",
+    "ollama": "qwen3:4b",
+}
 
 
 class Summarizer:
-    """LLM-basierte Chunk-Summarization via Anthropic Haiku.
+    """LLM-basierte Chunk-Summarization (Provider-agnostisch).
 
-    Usage:
-        s = Summarizer(knowledge_db_path)
-        stats = s.summarize_queue(limit=10)
+    Provider:
+        "anthropic" -- Claude Haiku via Anthropic SDK (pip install anthropic)
+        "ollama"    -- Lokales LLM via Ollama REST API (zero-dep)
+        "custom"    -- Eigene Funktion: fn(system_prompt, user_text) -> str
     """
 
-    def __init__(self, knowledge_db: Path, api_key: Optional[str] = None):
+    def __init__(
+        self,
+        knowledge_db: Path,
+        provider: str = "anthropic",
+        model: Optional[str] = None,
+        api_key: Optional[str] = None,
+        base_url: str = "http://localhost:11434",
+        llm_fn: Optional[Callable[[str, str], str]] = None,
+        system_prompt: Optional[str] = None,
+    ):
         self.knowledge_db = knowledge_db
+        self.provider = provider
+        self.model = model or _DEFAULT_MODELS.get(provider, "")
+        self.base_url = base_url.rstrip("/")
+        self.system_prompt = system_prompt or _SYSTEM_PROMPT
         self._conn: Optional[sqlite3.Connection] = None
-        self._api_key = api_key or os.environ.get('ANTHROPIC_API_KEY')
-        self._client = None
+
+        # Provider-spezifisch
+        if provider == "anthropic":
+            self._api_key = api_key or os.environ.get('ANTHROPIC_API_KEY')
+            self._client = None
+        elif provider == "custom":
+            if not llm_fn:
+                raise ValueError("provider='custom' braucht llm_fn parameter")
+            self._llm_fn = llm_fn
+        # ollama braucht keine Extra-Init
 
     def _get_conn(self) -> sqlite3.Connection:
-        """Lazy-init der DB-Connection."""
         if self._conn is None:
             self._conn = ensure_schema(self.knowledge_db)
         return self._conn
 
-    def _get_client(self):
-        """Lazy-init des Anthropic-Clients."""
+    def close(self):
+        if self._conn:
+            self._conn.close()
+            self._conn = None
+
+    # === Provider Backends ===
+
+    def _call_anthropic(self, text: str) -> Dict[str, Any]:
+        """Summarisiert via Anthropic API."""
         if self._client is None:
             if not self._api_key:
                 raise RuntimeError(
@@ -80,25 +122,75 @@ class Summarizer:
                 )
             import anthropic
             self._client = anthropic.Anthropic(api_key=self._api_key)
-        return self._client
 
-    def close(self):
-        """Schliesst DB-Connection."""
-        if self._conn:
-            self._conn.close()
-            self._conn = None
+        response = self._client.messages.create(
+            model=self.model,
+            max_tokens=512,
+            system=self.system_prompt,
+            messages=[{"role": "user", "content": text}],
+        )
+        return {
+            "text": response.content[0].text.strip(),
+            "input_tokens": response.usage.input_tokens,
+            "output_tokens": response.usage.output_tokens,
+        }
+
+    def _call_ollama(self, text: str) -> Dict[str, Any]:
+        """Summarisiert via Ollama REST API (zero-dep)."""
+        payload = {
+            "model": self.model,
+            "prompt": f"/no_think\n{text}" if "qwen" in self.model.lower() else text,
+            "system": self.system_prompt,
+            "stream": False,
+            "options": {"temperature": 0.3},
+        }
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            f"{self.base_url}/api/generate",
+            data=data,
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=600) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+
+        response_text = result.get("response", "")
+        # Thinking-Tags entfernen
+        if "<think>" in response_text:
+            response_text = re.sub(
+                r"<think>.*?</think>\s*", "", response_text, flags=re.DOTALL
+            ).strip()
+
+        return {
+            "text": response_text,
+            "input_tokens": result.get("prompt_eval_count", 0),
+            "output_tokens": result.get("eval_count", 0),
+        }
+
+    def _call_custom(self, text: str) -> Dict[str, Any]:
+        """Summarisiert via benutzerdefinierte Funktion."""
+        result_text = self._llm_fn(self.system_prompt, text)
+        return {
+            "text": result_text,
+            "input_tokens": 0,
+            "output_tokens": 0,
+        }
+
+    def _call_llm(self, text: str) -> Dict[str, Any]:
+        """Dispatcht an den konfigurierten Provider."""
+        if self.provider == "anthropic":
+            return self._call_anthropic(text)
+        elif self.provider == "ollama":
+            return self._call_ollama(text)
+        elif self.provider == "custom":
+            return self._call_custom(text)
+        else:
+            raise ValueError(f"Unbekannter Provider: {self.provider}")
+
+    # === Core Logic ===
 
     def summarize_queue(self, *, limit: int = 10,
                         delay: float = 0.5) -> Dict[str, Any]:
-        """Verarbeitet pending Items aus der digest_queue.
-
-        Args:
-            limit: Maximale Anzahl Queue-Items
-            delay: Pause zwischen API-Calls in Sekunden
-
-        Returns:
-            Statistiken ueber die Verarbeitung
-        """
+        """Verarbeitet pending Items aus der digest_queue."""
         start = time.time()
         conn = self._get_conn()
 
@@ -107,10 +199,11 @@ class Summarizer:
             'errors': 0,
             'total_input_tokens': 0,
             'total_output_tokens': 0,
+            'provider': self.provider,
+            'model': self.model,
             'items': [],
         }
 
-        # Pending Items holen
         queue_items = conn.execute("""
             SELECT id, source_type, source_id
             FROM digest_queue
@@ -128,7 +221,6 @@ class Summarizer:
             source_type = item['source_type']
             source_id = item['source_id']
 
-            # Status auf 'processing' setzen
             conn.execute(
                 "UPDATE digest_queue SET status='processing', "
                 "started_at=CURRENT_TIMESTAMP WHERE id=?",
@@ -137,7 +229,6 @@ class Summarizer:
             conn.commit()
 
             try:
-                # Chunks fuer diese Quelle laden
                 chunks = self._load_chunks(conn, source_type, source_id)
                 if not chunks:
                     conn.execute(
@@ -150,7 +241,6 @@ class Summarizer:
                     stats['errors'] += 1
                     continue
 
-                # Jeden Chunk summarisieren
                 item_result = {
                     'source_type': source_type,
                     'source_id': source_id,
@@ -165,7 +255,6 @@ class Summarizer:
                     if summary_result.get('error'):
                         continue
 
-                    # Summary in DB speichern
                     conn.execute("""
                         INSERT INTO summaries
                             (source_type, source_id, chunk_index, summary,
@@ -185,7 +274,7 @@ class Summarizer:
                         summary_result['summary'],
                         ','.join(summary_result.get('keywords', [])),
                         summary_result.get('domain', ''),
-                        _MODEL,
+                        self.model,
                         summary_result.get('input_tokens', 0),
                         summary_result.get('output_tokens', 0),
                     ))
@@ -194,7 +283,6 @@ class Summarizer:
                     item_result['input_tokens'] += summary_result.get('input_tokens', 0)
                     item_result['output_tokens'] += summary_result.get('output_tokens', 0)
 
-                    # Rate-Limiting
                     if delay > 0:
                         time.sleep(delay)
 
@@ -222,16 +310,15 @@ class Summarizer:
         elapsed = int((time.time() - start) * 1000)
         stats['duration_ms'] = elapsed
 
-        # Kosten-Schaetzung (Haiku: ~$0.25/MTok Input, ~$1.25/MTok Output)
-        input_cost = stats['total_input_tokens'] / 1_000_000 * 0.25
-        output_cost = stats['total_output_tokens'] / 1_000_000 * 1.25
-        stats['estimated_cost_usd'] = round(input_cost + output_cost, 4)
+        if self.provider == "anthropic":
+            input_cost = stats['total_input_tokens'] / 1_000_000 * 0.25
+            output_cost = stats['total_output_tokens'] / 1_000_000 * 1.25
+            stats['estimated_cost_usd'] = round(input_cost + output_cost, 4)
 
         return stats
 
     def _load_chunks(self, conn: sqlite3.Connection,
                      source_type: str, source_id: int) -> List[tuple]:
-        """Laedt Chunks fuer eine Quelle."""
         if source_type == 'document':
             rows = conn.execute(
                 "SELECT chunk_index, content FROM document_chunks "
@@ -252,26 +339,13 @@ class Summarizer:
             ).fetchall()
         else:
             return []
-
         return [(r['chunk_index'], r['content']) for r in rows]
 
     def _summarize_chunk(self, text: str) -> Dict[str, Any]:
-        """Summarisiert einen einzelnen Chunk via Haiku."""
+        """Summarisiert einen einzelnen Chunk via konfiguriertem Provider."""
         try:
-            client = self._get_client()
-            response = client.messages.create(
-                model=_MODEL,
-                max_tokens=512,
-                system=_SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": text}],
-            )
-
-            # Token-Usage
-            input_tokens = response.usage.input_tokens
-            output_tokens = response.usage.output_tokens
-
-            # Response parsen
-            raw_text = response.content[0].text.strip()
+            llm_result = self._call_llm(text)
+            raw_text = llm_result["text"]
 
             # JSON extrahieren (auch wenn in Markdown eingebettet)
             if raw_text.startswith('```'):
@@ -279,30 +353,36 @@ class Summarizer:
                 json_lines = [l for l in lines if not l.startswith('```')]
                 raw_text = '\n'.join(json_lines)
 
+            # JSON-Block aus Text extrahieren falls noetig
+            json_match = re.search(r'\{[^{}]*\}', raw_text, re.DOTALL)
+            if json_match:
+                raw_text = json_match.group()
+
             data = json.loads(raw_text)
 
             return {
                 'summary': data.get('summary', ''),
                 'keywords': data.get('keywords', []),
                 'domain': data.get('domain', ''),
-                'input_tokens': input_tokens,
-                'output_tokens': output_tokens,
+                'input_tokens': llm_result.get('input_tokens', 0),
+                'output_tokens': llm_result.get('output_tokens', 0),
             }
 
         except json.JSONDecodeError:
             # Fallback: rohen Text als Summary verwenden
             return {
-                'summary': raw_text[:500] if 'raw_text' in dir() else '',
+                'summary': llm_result.get('text', '')[:500],
                 'keywords': [],
                 'domain': '',
-                'input_tokens': input_tokens if 'input_tokens' in dir() else 0,
-                'output_tokens': output_tokens if 'output_tokens' in dir() else 0,
+                'input_tokens': llm_result.get('input_tokens', 0),
+                'output_tokens': llm_result.get('output_tokens', 0),
             }
         except Exception as e:
             return {'error': str(e)}
 
+    # === Queue Management ===
+
     def enqueue_skills(self) -> int:
-        """Erstellt Queue-Eintraege fuer alle Skills (ohne bestehende Summaries)."""
         conn = self._get_conn()
         count = 0
         rows = conn.execute(
@@ -323,7 +403,6 @@ class Summarizer:
         return count
 
     def enqueue_wikis(self) -> int:
-        """Erstellt Queue-Eintraege fuer alle Wikis (ohne bestehende Summaries)."""
         conn = self._get_conn()
         count = 0
         rows = conn.execute(
@@ -344,7 +423,6 @@ class Summarizer:
         return count
 
     def get_queue_status(self) -> Dict[str, Any]:
-        """Gibt Queue-Statistiken zurueck."""
         conn = self._get_conn()
 
         by_status = conn.execute("""
@@ -371,11 +449,9 @@ class Summarizer:
             "SELECT SUM(output_tokens) FROM summaries"
         ).fetchone()[0] or 0
 
-        # Kosten
-        input_cost = total_tokens_in / 1_000_000 * 0.25
-        output_cost = total_tokens_out / 1_000_000 * 1.25
-
-        return {
+        result = {
+            'provider': self.provider,
+            'model': self.model,
             'queue': {r['status']: r['cnt'] for r in by_status},
             'by_type': [
                 {'source_type': r['source_type'],
@@ -387,6 +463,14 @@ class Summarizer:
                 'total': total_summaries,
                 'total_input_tokens': total_tokens_in,
                 'total_output_tokens': total_tokens_out,
-                'estimated_cost_usd': round(input_cost + output_cost, 4),
             },
         }
+
+        if self.provider == "anthropic":
+            input_cost = total_tokens_in / 1_000_000 * 0.25
+            output_cost = total_tokens_out / 1_000_000 * 1.25
+            result['summaries']['estimated_cost_usd'] = round(
+                input_cost + output_cost, 4
+            )
+
+        return result
