@@ -1062,9 +1062,10 @@ Status:
     ing.add_argument("--chunk-size", type=int, default=350, help="Woerter pro Chunk")
 
     # summarize
-    summ = sub.add_parser("summarize", help="LLM-Summarization (Haiku)")
+    summ = sub.add_parser("summarize", help="LLM-Summarization (Haiku or Flash)")
     summ.add_argument("--limit", "-l", type=int, default=10, help="Max Queue-Items")
     summ.add_argument("--delay", type=float, default=0.5, help="Pause zwischen Calls (s)")
+    summ.add_argument("--flash", action="store_true", help="Nutze Gemini 1.5 Flash")
 
     # enqueue
     sub.add_parser("enqueue", help="Skills+Wikis in Summarization-Queue")
@@ -1076,6 +1077,10 @@ Status:
     sa = sub.add_parser("search-all", help="Unified Search (Skills+Wikis+Docs)")
     sa.add_argument("query")
     sa.add_argument("--limit", "-l", type=int, default=20)
+    
+    # deduplicate
+    de = sub.add_parser("deduplicate", help="Duplikate auf Festplatte suchen und in Papierkorb verschieben")
+    de.add_argument("-y", "--yes", action="store_true", help="Alle Duplikate automatisch loeschen ohne Nachfrage")
 
     args = parser.parse_args()
     kd = KnowledgeDigest()
@@ -1226,13 +1231,39 @@ Status:
             print(json.dumps(result, indent=2, ensure_ascii=False))
 
     elif args.cmd == "summarize":
-        result = kd.summarize(limit=args.limit, delay=args.delay)
-        print(f"Verarbeitet: {result.get('processed', 0)} | "
-              f"Fehler: {result.get('errors', 0)} | "
-              f"Dauer: {result.get('duration_ms', 0)}ms")
-        print(f"Tokens: {result.get('total_input_tokens', 0)} in / "
-              f"{result.get('total_output_tokens', 0)} out | "
-              f"Kosten: ~${result.get('estimated_cost_usd', 0)}")
+        if args.flash:
+            try:
+                from .gemini_flash_summarizer import GeminiFlashSummarizer
+            except ImportError:
+                from gemini_flash_summarizer import GeminiFlashSummarizer
+            import os
+            api_key = os.environ.get("GEMINI_API_KEY")
+            if not api_key:
+                print("FEHLER: GEMINI_API_KEY Umgebungsvariable nicht gesetzt!")
+                return
+            
+            # Da db_path als Eigenschaft vorliegt:
+            summarizer = GeminiFlashSummarizer(api_key, kd.db_path)
+            
+            limit = args.limit
+            if limit <= 0:
+                limit = 100
+                
+            result = summarizer.summarize_queue(limit=limit)
+            print(f"Verarbeitet: {result.get('processed', 0)} | "
+                  f"Fehler: {result.get('errors', 0)} | "
+                  f"Dauer: {result.get('duration_ms', 0)}ms")
+            print(f"Tokens: {result.get('total_input_tokens', 0)} in / "
+                  f"{result.get('total_output_tokens', 0)} out | "
+                  f"Kosten: ~${result.get('estimated_cost_usd', 0)}")
+        else:
+            result = kd.summarize(limit=args.limit, delay=args.delay)
+            print(f"Verarbeitet: {result.get('processed', 0)} | "
+                  f"Fehler: {result.get('errors', 0)} | "
+                  f"Dauer: {result.get('duration_ms', 0)}ms")
+            print(f"Tokens: {result.get('total_input_tokens', 0)} in / "
+                  f"{result.get('total_output_tokens', 0)} out | "
+                  f"Kosten: ~${result.get('estimated_cost_usd', 0)}")
 
     elif args.cmd == "enqueue":
         result = kd.enqueue_all()
@@ -1255,6 +1286,65 @@ Status:
             if r.get('snippet'):
                 print(f"    {r['snippet'][:120]}")
             print()
+            
+    elif args.cmd == "deduplicate":
+        conn = kd._get_conn()
+        try:
+            dups = conn.execute("""
+                SELECT content_hash, COUNT(*) as cnt 
+                FROM documents 
+                GROUP BY content_hash 
+                HAVING cnt > 1
+            """).fetchall()
+            
+            if not dups:
+                print("Keine Duplikate gefunden!")
+            else:
+                print(f"{len(dups)} Gruppen von Duplikaten gefunden.\n")
+                import shutil, os
+                from pathlib import Path
+                trash_dir = kd.db_path.parent / "_Papierkorb"
+                trash_dir.mkdir(parents=True, exist_ok=True)
+                
+                for row in dups:
+                    hash_val = row['content_hash']
+                    docs = conn.execute("SELECT id, file_path, filename FROM documents WHERE content_hash=? ORDER BY id", (hash_val,)).fetchall()
+                    print(f"\n--- Duplikat-Gruppe ({len(docs)} Dateien) ---")
+                    for i, d in enumerate(docs):
+                        print(f"  {i+1}: {d['file_path']}")
+                    
+                    if not args.yes:
+                        ans = input("Alle ab Datei 2 in den Papierkorb verschieben? (y/n): ")
+                        if ans.lower() != 'y':
+                            continue
+                            
+                    for d in docs[1:]:
+                        doc_id = d['id']
+                        file_path = d['file_path']
+                        print(f"-> Loesche: {file_path}")
+                        
+                        if os.path.exists(file_path):
+                            base_name = os.path.basename(file_path)
+                            trash_path = trash_dir / base_name
+                            counter = 1
+                            while trash_path.exists():
+                                name, ext = os.path.splitext(base_name)
+                                trash_path = trash_dir / f"{name}_{counter}{ext}"
+                                counter += 1
+                            try:
+                                shutil.move(file_path, trash_path)
+                            except Exception as e:
+                                print(f"  Fehler beim Verschieben: {e}")
+                        
+                        conn.execute("DELETE FROM summaries WHERE source_type='document' AND source_id=?", (doc_id,))
+                        conn.execute("DELETE FROM document_keywords WHERE doc_id=?", (doc_id,))
+                        conn.execute("DELETE FROM document_chunks WHERE doc_id=?", (doc_id,))
+                        conn.execute("DELETE FROM digest_queue WHERE source_type='document' AND source_id=?", (doc_id,))
+                        conn.execute("DELETE FROM documents WHERE id=?", (doc_id,))
+                        conn.commit()
+                print("\nDuplikat-Bereinigung abgeschlossen!")
+        finally:
+            conn.close()
 
     else:
         parser.print_help()

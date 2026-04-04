@@ -292,11 +292,39 @@ def page_doc(db_path, doc_id):
         <a href="#" onclick="openFile({doc_id}); return false;"
            style="display:inline-block;padding:8px 16px;background:var(--accent);color:#fff;
            border-radius:6px;font-weight:600;cursor:pointer;text-decoration:none">Datei oeffnen</a>
+        <a href="#" onclick="resetDoc({doc_id}); return false;"
+           style="display:inline-block;padding:8px 16px;background:var(--red);color:#fff;
+           border-radius:6px;font-weight:600;cursor:pointer;text-decoration:none;margin-left:12px">
+           Summaries zurücksetzen</a>
+        <a href="#" onclick="deleteFile({doc_id}); return false;"
+           style="display:inline-block;padding:8px 16px;background:#222;color:#ff4444;
+           border-radius:6px;font-weight:600;cursor:pointer;text-decoration:none;margin-left:12px;border:1px solid #ff4444">
+           🗑️ LÖSCHEN (Papierkorb)</a>
     </div></div>
     <script>
     function openFile(docId) {{
         fetch('/open/' + docId).then(r => r.json())
             .then(data => {{ if (!data.ok) alert('Fehler: ' + data.error); }})
+            .catch(e => alert('Fehler: ' + e));
+    }}
+    function resetDoc(docId) {{
+        if(!confirm('Summaries fuer dieses Dokument loeschen und neu berechnen lassen?')) return;
+        fetch('/api/reset_doc/' + docId, {{method: 'POST'}})
+            .then(r => r.json())
+            .then(data => {{
+                if(data.ok) location.reload();
+                else alert('Fehler: ' + data.error);
+            }})
+            .catch(e => alert('Fehler: ' + e));
+    }}
+    function deleteFile(docId) {{
+        if(!confirm('ACHTUNG: Soll die echte Datei physisch in den _Papierkorb verschoben und komplett aus der Datenbank entfernt werden?')) return;
+        fetch('/api/delete_file/' + docId, {{method: 'POST'}})
+            .then(r => r.json())
+            .then(data => {{
+                if(data.ok) location.href = '/';
+                else alert('Fehler: ' + data.error);
+            }})
             .catch(e => alert('Fehler: ' + e));
     }}
     </script>"""
@@ -446,6 +474,57 @@ class ViewerHandler(BaseHTTPRequestHandler):
                 result = self._open_file(doc_id)
                 self._respond(200, json.dumps(result), "application/json")
                 return
+            elif path.startswith("/api/reset_doc/"):
+                doc_id = int(path.split("/api/reset_doc/")[1])
+                conn = _get_conn(self.db_path)
+                try:
+                    conn.execute("DELETE FROM summaries WHERE source_type='document' AND source_id=?", (doc_id,))
+                    conn.execute("UPDATE digest_queue SET status='pending', error_msg=NULL WHERE source_type='document' AND source_id=?", (doc_id,))
+                    conn.commit()
+                    self._respond(200, json.dumps({"ok": True}), "application/json")
+                except Exception as e:
+                    self._respond(500, json.dumps({"ok": False, "error": str(e)}), "application/json")
+                finally:
+                    conn.close()
+                return
+            elif path.startswith("/api/delete_file/"):
+                doc_id = int(path.split("/api/delete_file/")[1])
+                conn = _get_conn(self.db_path)
+                try:
+                    doc = conn.execute("SELECT file_path FROM documents WHERE id=?", (doc_id,)).fetchone()
+                    if doc:
+                        import shutil, os
+                        from pathlib import Path
+                        file_path = doc['file_path']
+                        trash_dir = Path(self.db_path).parent / "_Papierkorb"
+                        trash_dir.mkdir(parents=True, exist_ok=True)
+                        if os.path.exists(file_path):
+                            base_name = os.path.basename(file_path)
+                            trash_path = trash_dir / base_name
+                            counter = 1
+                            while trash_path.exists():
+                                name, ext = os.path.splitext(base_name)
+                                trash_path = trash_dir / f"{name}_{counter}{ext}"
+                                counter += 1
+                            try:
+                                shutil.move(file_path, str(trash_path))
+                            except Exception as e:
+                                print(f"Move Error: {e}")
+                        
+                        conn.execute("DELETE FROM summaries WHERE source_type='document' AND source_id=?", (doc_id,))
+                        conn.execute("DELETE FROM document_keywords WHERE doc_id=?", (doc_id,))
+                        conn.execute("DELETE FROM document_chunks WHERE doc_id=?", (doc_id,))
+                        conn.execute("DELETE FROM digest_queue WHERE source_type='document' AND source_id=?", (doc_id,))
+                        conn.execute("DELETE FROM documents WHERE id=?", (doc_id,))
+                        conn.commit()
+                        self._respond(200, json.dumps({"ok": True}), "application/json")
+                    else:
+                        self._respond(404, json.dumps({"ok": False, "error": "Doc not found"}), "application/json")
+                except Exception as e:
+                    self._respond(500, json.dumps({"ok": False, "error": str(e)}), "application/json")
+                finally:
+                    conn.close()
+                return
             else:
                 content = _layout('<div class="card">404 - Seite nicht gefunden</div>', "dash", self.db_path)
             self._respond(200, content)
@@ -453,6 +532,10 @@ class ViewerHandler(BaseHTTPRequestHandler):
             content = _layout(f'<div class="card" style="color:var(--red)">Fehler: {_esc(str(e))}</div>',
                               "dash", self.db_path)
             self._respond(500, content)
+
+    def do_POST(self):
+        """Alle POST-Requests einfach an do_GET delegieren."""
+        self.do_GET()
 
     def _open_file(self, doc_id):
         conn = _get_conn(self.db_path)

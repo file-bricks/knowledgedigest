@@ -149,6 +149,15 @@ zero impact when disabled.
 - PyMuPDF (for PDF preview in GUI)
 - No additional dependencies for CLI or Web Viewer
 
+## Changelog
+
+**v0.4.0 (Latest)**
+- **Gemini 1.5 Flash Summarizer**: Extreme high-speed API option (`--flash`) added for LLM summarization.
+- **Agent Tollbooth (`zoll_station.py`)**: Smart routing for AI agents processing summarize queues.
+- **Physical Trash (Web Viewer)**: Added a GUI button to physically quarantine file duplicates into a dynamic `_Papierkorb` folder. Delete API route fully integrated via `do_POST`.
+- **Deduplication CLI**: Added `python -m KnowledgeDigest deduplicate` to identify cryptographic duplicates and auto-clean DB and filesystem.
+- **Summary Reset**: Added a Web Viewer button to trash faulty summaries and place standard documents back into pending queue.
+
 ## See Also: ProFiler
 
 Need PDF encryption, OCR, anonymization, or file versioning? Check out [ProFiler](https://github.com/file-bricks/ProFiler) -- a professional file management suite from the same author.
