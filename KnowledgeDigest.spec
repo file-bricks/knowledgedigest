@@ -17,7 +17,7 @@ a = Analysis(
     pathex=[os.path.dirname(BASE)],  # Parent dir so KnowledgeDigest package is findable
     binaries=[],
     datas=[
-        # Prompt-Templates falls vorhanden
+        (os.path.join(BASE, 'KnowledgeDigest.ico'), '.'),
     ],
     hiddenimports=[
         'KnowledgeDigest',
@@ -82,4 +82,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon=os.path.join(BASE, 'KnowledgeDigest.ico'),
 )

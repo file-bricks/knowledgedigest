@@ -7,7 +7,7 @@ Startet die PySide6-Anwendung mit Dark Theme.
 import sys
 from pathlib import Path
 from PySide6.QtWidgets import QApplication
-from PySide6.QtGui import QPalette, QColor
+from PySide6.QtGui import QPalette, QColor, QIcon
 from PySide6.QtCore import Qt
 
 
@@ -177,17 +177,28 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
 """
 
 
+def _load_app_icon() -> QIcon:
+    base_dir = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parents[1]
+    icon_path = base_dir / "KnowledgeDigest.ico"
+    return QIcon(str(icon_path)) if icon_path.exists() else QIcon()
+
+
 def launch_gui():
     """Startet die KnowledgeDigest GUI."""
     app = QApplication(sys.argv)
     app.setApplicationName("KnowledgeDigest")
     app.setOrganizationName("KnowledgeDigest")
+    icon = _load_app_icon()
+    if not icon.isNull():
+        app.setWindowIcon(icon)
 
     _apply_dark_palette(app)
     app.setStyleSheet(STYLESHEET)
 
     from .main_window import MainWindow
     window = MainWindow()
+    if not icon.isNull():
+        window.setWindowIcon(icon)
     window.show()
 
     return app.exec()
