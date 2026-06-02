@@ -1,4 +1,4 @@
-# KnowledgeDigest -- Architecture (v0.3.0)
+# KnowledgeDigest -- Architecture (v0.4.0)
 
 ## Overview
 
@@ -44,6 +44,7 @@ KnowledgeDigest/
 │   ├── knowledge.db       # SQLite database (created at runtime)
 │   └── knowledgedigest.json  # Config file (created at runtime)
 ├── requirements.txt
+├── pyproject.toml         # Installable package metadata
 ├── LICENSE                 # MIT
 ├── README.md
 ├── SECURITY.md

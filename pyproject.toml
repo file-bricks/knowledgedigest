@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "knowledgedigest"
+version = "0.4.0"
+description = "Portable local knowledge database with FTS5 search, chunking, desktop GUI, and web viewer."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+  { name = "Lukas Geiger" }
+]
+keywords = ["knowledge-base", "fts5", "sqlite", "document-search", "local-first"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: End Users/Desktop",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Desktop Environment",
+  "Topic :: Text Processing :: Indexing"
+]
+
+[project.urls]
+Homepage = "https://github.com/file-bricks/knowledgedigest"
+Repository = "https://github.com/file-bricks/knowledgedigest"
+Issues = "https://github.com/file-bricks/knowledgedigest/issues"
+
+[project.scripts]
+knowledgedigest = "KnowledgeDigest.digest:main"
+
+[tool.setuptools]
+packages = [
+  "KnowledgeDigest",
+  "KnowledgeDigest.gui",
+  "KnowledgeDigest.gui.dialogs",
+  "KnowledgeDigest.gui.panels",
+  "KnowledgeDigest.gui.widgets"
+]
+
+[tool.setuptools.package-dir]
+KnowledgeDigest = "."

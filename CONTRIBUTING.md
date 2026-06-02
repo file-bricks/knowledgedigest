@@ -5,7 +5,7 @@ Thanks for your interest in contributing!
 ## Getting Started
 
 1. Fork and clone: `git clone https://github.com/YOUR_USERNAME/knowledgedigest.git`
-2. Install: `pip install -r requirements.txt`
+2. Install: `pip install -r requirements.txt && pip install -e .`
 3. Run: `python -m KnowledgeDigest --gui` or `--web`
 
 ## How to Contribute

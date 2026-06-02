@@ -1,0 +1,24 @@
+# KnowledgeDigest
+
+KnowledgeDigest is a local-first Python tool for indexing documents into a portable SQLite/FTS5 knowledge database. It supports chunking, full-text search, optional LLM summaries, a PySide6 desktop GUI, a stdlib web viewer, CLI commands, and a Python API.
+
+Canonical repository: https://github.com/file-bricks/knowledgedigest
+
+## Useful Entry Points
+
+- `README.md`: user-facing overview, installation, commands, and feature summary.
+- `ARCHITECTURE.md`: module map, data flow, schema overview, and design decisions.
+- `digest.py`: high-level API and CLI command implementation.
+- `web_viewer.py`: local browser viewer without external web framework dependencies.
+- `gui/`: PySide6 desktop interface.
+- `tests/test_core.py`: focused regression tests for core modules.
+
+## Run And Test
+
+```bash
+python -m pip install -e .
+python -m pytest tests -q
+python -m KnowledgeDigest status
+```
+
+Runtime data is local and ignored by Git: `data/`, `*.db`, and `knowledgedigest.json`.

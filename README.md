@@ -7,9 +7,10 @@ with LLM (Haiku). Two frontends: **PySide6 Desktop GUI** and **Web Viewer**.
 ## Quick Start
 
 ```bash
-git clone https://github.com/lukisch/knowledgedigest
+git clone https://github.com/file-bricks/knowledgedigest
 cd knowledgedigest
 pip install -r requirements.txt
+pip install -e .
 
 # Desktop GUI (PySide6, dark theme, 3-panel layout)
 python -m KnowledgeDigest --gui
@@ -87,8 +88,8 @@ Startable standalone (`--web`) or from within the GUI (toolbar button).
 
 | Interface | Command | Status |
 |-----------|---------|--------|
-| **Desktop GUI** | `python -m KnowledgeDigest --gui` | v0.3.0 |
-| **Web Viewer** | `python -m KnowledgeDigest --web` | v0.3.0 |
+| **Desktop GUI** | `python -m KnowledgeDigest --gui` | v0.4.0 |
+| **Web Viewer** | `python -m KnowledgeDigest --web` | v0.4.0 |
 | **CLI** | `python -m KnowledgeDigest status` | v0.1.0+ |
 | **Python API** | `from KnowledgeDigest import KnowledgeDigest` | v0.1.0+ |
 | **SQLite Direct** | Any SQLite tool on `knowledge.db` | Always |
@@ -149,6 +150,12 @@ zero impact when disabled.
 - PyMuPDF (for PDF preview in GUI)
 - No additional dependencies for CLI or Web Viewer
 
+## Runtime Data
+
+KnowledgeDigest stores local runtime data in `data/knowledge.db` and optional
+`knowledgedigest.json` config files. These files are ignored by Git and should
+not be committed.
+
 ## Changelog
 
 **v0.4.0 (Latest)**
@@ -189,7 +196,7 @@ Lukas Geiger ([github.com/lukisch](https://github.com/lukisch))
 
 ## Haftung / Liability
 
-Dieses Projekt ist eine **unentgeltliche Open-Source-Schenkung** im Sinne der §§ 516 ff. BGB. Die Haftung des Urhebers ist gemäß **§ 521 BGB** auf **Vorsatz und grobe Fahrlässigkeit** beschränkt. Ergänzend gelten die Haftungsausschlüsse aus GPL-3.0 / MIT / Apache-2.0 §§ 15–16 (je nach gewählter Lizenz).
+Dieses Projekt ist eine **unentgeltliche Open-Source-Schenkung** im Sinne der §§ 516 ff. BGB. Die Haftung des Urhebers ist gemäß **§ 521 BGB** auf **Vorsatz und grobe Fahrlässigkeit** beschränkt. Ergänzend gelten die Haftungsausschlüsse der MIT-Lizenz.
 
 Nutzung auf eigenes Risiko. Keine Wartungszusage, keine Verfügbarkeitsgarantie, keine Gewähr für Fehlerfreiheit oder Eignung für einen bestimmten Zweck.
 

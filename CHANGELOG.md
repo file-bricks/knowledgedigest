@@ -1,0 +1,18 @@
+# Changelog
+
+## 2026-06-02
+
+- Added packaging metadata so the repository can be installed as `knowledgedigest` while exposing the `KnowledgeDigest` package.
+- Added GitHub Actions test workflow for Python 3.10, 3.11, and 3.12.
+- Updated community workflow action versions.
+- Corrected repository links from the former `lukisch` location to `file-bricks/knowledgedigest`.
+- Aligned public docs with version `0.4.0` and cleaned visible encoding artifacts.
+
+## 2026-05-17
+
+- Added unit tests for core modules.
+
+## 2026-05-01
+
+- Added KnowledgeDigest icon and EXE build support.
+- Backported v0.4.0 features from the local knowledge database line, including Gemini Flash summarization, deduplication, trash handling, and agent routing.
