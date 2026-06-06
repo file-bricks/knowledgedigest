@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-06-06
+
+- Updated the test workflow to current `actions/checkout@v6` and `actions/setup-python@v6` majors.
+
 ## 2026-06-02
 
 - Added packaging metadata so the repository can be installed as `knowledgedigest` while exposing the `KnowledgeDigest` package.
