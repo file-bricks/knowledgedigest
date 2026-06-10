@@ -2,7 +2,7 @@
 
 KnowledgeDigest is a local-first Python tool for indexing documents into a portable SQLite/FTS5 knowledge database. It supports chunking, full-text search, optional LLM summaries, a PySide6 desktop GUI, a stdlib web viewer, CLI commands, and a Python API.
 
-Canonical repository: https://github.com/lukisch/knowledgedigest
+Canonical repository: https://github.com/file-bricks/knowledgedigest
 
 ## Useful Entry Points
 

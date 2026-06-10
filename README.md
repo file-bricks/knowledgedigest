@@ -7,7 +7,7 @@ with LLM (Haiku). Two frontends: **PySide6 Desktop GUI** and **Web Viewer**.
 ## Quick Start
 
 ```bash
-git clone https://github.com/lukisch/knowledgedigest
+git clone https://github.com/file-bricks/knowledgedigest
 cd knowledgedigest
 pip install -r requirements.txt
 pip install -e .
