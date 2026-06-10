@@ -28,16 +28,31 @@ from pathlib import Path
 from typing import List, Dict, Optional, Any
 
 from .schema import ensure_schema
-from .indexer import SkillIndexer
-from .wiki_indexer import WikiIndexer
+from .config import get_config, Config
+
+# Lazy imports fuer optionale Module
+_SkillIndexer = None
+_WikiIndexer = None
+
+
+def _get_skill_indexer():
+    global _SkillIndexer
+    if _SkillIndexer is None:
+        from .indexer import SkillIndexer
+        _SkillIndexer = SkillIndexer
+    return _SkillIndexer
+
+
+def _get_wiki_indexer():
+    global _WikiIndexer
+    if _WikiIndexer is None:
+        from .wiki_indexer import WikiIndexer
+        _WikiIndexer = WikiIndexer
+    return _WikiIndexer
+
+
 from .ingestor import DocumentIngestor
 from .summarizer import Summarizer
-
-# Default: knowledge.db im data/ Unterordner
-_DEFAULT_DB = Path(__file__).parent / "data" / "knowledge.db"
-
-# BACH-Standard-Pfad (Windows)
-_DEFAULT_BACH_DB = Path(r"C:\Users\lukas\OneDrive\KI&AI\BACH_v2_vanilla\system\data\bach.db")
 
 
 class KnowledgeDigest:
@@ -54,17 +69,19 @@ class KnowledgeDigest:
         results = kd.search_all("CRISPR")
     """
 
-    def __init__(self, db_path: Optional[Path] = None):
+    def __init__(self, db_path: Optional[Path] = None, config: Optional[Config] = None):
         """Initialisiert KnowledgeDigest.
 
         Args:
-            db_path: Pfad zur knowledge.db (Default: data/knowledge.db)
+            db_path: Pfad zur knowledge.db (Default: aus Config)
+            config: Config-Instanz (Default: globale Config)
         """
-        self.db_path = Path(db_path) if db_path else _DEFAULT_DB
+        self._config = config or get_config()
+        self.db_path = Path(db_path) if db_path else self._config.get_db_path()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._indexer = SkillIndexer(self.db_path)
-        self._wiki_indexer = WikiIndexer(self.db_path)
-        self._ingestor = DocumentIngestor(self.db_path)
+        self._indexer = None  # Lazy init (BACH optional)
+        self._wiki_indexer = None  # Lazy init (BACH optional)
+        self._ingestor = DocumentIngestor(self.db_path, config=self._config)
         self._summarizer = Summarizer(self.db_path)
 
     def _get_conn(self) -> sqlite3.Connection:
@@ -90,7 +107,17 @@ class KnowledgeDigest:
         Returns:
             Statistiken ueber die Indexierung
         """
-        path = Path(bach_db_path) if bach_db_path else _DEFAULT_BACH_DB
+        if bach_db_path:
+            path = Path(bach_db_path)
+        else:
+            bach_cfg = self._config.get("bach_db_path", "")
+            if not bach_cfg:
+                return {"error": "Kein bach_db_path konfiguriert. Setze bach_db_path in knowledgedigest.json."}
+            path = Path(bach_cfg)
+        if not path.exists():
+            return {"error": f"bach.db nicht gefunden: {path}"}
+        if self._indexer is None:
+            self._indexer = _get_skill_indexer()(self.db_path)
         return self._indexer.index_from_bach(
             path, chunk_size=chunk_size, overlap=overlap, force=force
         )
@@ -388,8 +415,8 @@ class KnowledgeDigest:
 
     def get_status(self) -> Dict[str, Any]:
         """Gibt umfassende Index-Statistiken zurueck."""
-        skill_status = self._indexer.get_index_status()
-        wiki_status = self._wiki_indexer.get_index_status()
+        skill_status = self._indexer.get_index_status() if self._indexer else {"total": 0, "note": "BACH nicht konfiguriert"}
+        wiki_status = self._wiki_indexer.get_index_status() if self._wiki_indexer else {"total": 0, "note": "BACH nicht konfiguriert"}
         doc_status = self._ingestor.get_ingest_status()
         queue_status = self._summarizer.get_queue_status()
 
@@ -408,12 +435,15 @@ class KnowledgeDigest:
             'wikis': wiki_status,
             'documents': doc_status,
             'queue': queue_status,
+            'indexed_directories': self._config.get_indexed_directories(),
         }
 
     def close(self):
         """Schliesst alle offenen Connections."""
-        self._indexer.close()
-        self._wiki_indexer.close()
+        if self._indexer:
+            self._indexer.close()
+        if self._wiki_indexer:
+            self._wiki_indexer.close()
         self._ingestor.close()
         self._summarizer.close()
 
@@ -447,6 +477,48 @@ class KnowledgeDigest:
             )
         else:
             return {'error': f'Pfad nicht gefunden: {path}'}
+
+    # ==================================================================
+    # DIRECTORY MANAGEMENT
+    # ==================================================================
+
+    def get_directories(self) -> List[Dict[str, Any]]:
+        """Gibt indexierte Verzeichnisse mit Dokumentenzahl zurueck."""
+        dirs = self._config.get_indexed_directories()
+        conn = self._get_conn()
+        result = []
+        for d in dirs:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM documents WHERE source_dir LIKE ?",
+                (d + "%",)
+            ).fetchone()[0]
+            result.append({"path": d, "doc_count": count})
+        conn.close()
+        return result
+
+    def add_directory(self, path: str) -> Dict[str, Any]:
+        """Fuegt Verzeichnis zur Index-Liste hinzu."""
+        p = Path(path).resolve()
+        if not p.is_dir():
+            return {"error": f"Verzeichnis nicht gefunden: {path}"}
+        self._config.add_directory(str(p))
+        return {"ok": True, "path": str(p)}
+
+    def remove_directory(self, path: str) -> Dict[str, Any]:
+        """Entfernt Verzeichnis aus Index-Liste."""
+        self._config.remove_directory(path)
+        return {"ok": True, "path": path}
+
+    def scan_directory(self, path: str, *, recursive: bool = True,
+                       archive: bool = False,
+                       chunk_size: int = 350) -> Dict[str, Any]:
+        """Scannt ein Verzeichnis und ingested neue Dateien."""
+        p = Path(path)
+        if not p.is_dir():
+            return {"error": f"Verzeichnis nicht gefunden: {path}"}
+        return self._ingestor.ingest_directory(
+            p, archive=archive, chunk_size=chunk_size, recursive=recursive
+        )
 
     # ==================================================================
     # LLM SUMMARIZATION
@@ -594,7 +666,17 @@ class KnowledgeDigest:
         Returns:
             Statistiken ueber die Indexierung
         """
-        path = Path(bach_db_path) if bach_db_path else _DEFAULT_BACH_DB
+        if bach_db_path:
+            path = Path(bach_db_path)
+        else:
+            bach_cfg = self._config.get("bach_db_path", "")
+            if not bach_cfg:
+                return {"error": "Kein bach_db_path konfiguriert. Setze bach_db_path in knowledgedigest.json."}
+            path = Path(bach_cfg)
+        if not path.exists():
+            return {"error": f"bach.db nicht gefunden: {path}"}
+        if self._wiki_indexer is None:
+            self._wiki_indexer = _get_wiki_indexer()(self.db_path)
         return self._wiki_indexer.index_from_bach(
             path, chunk_size=chunk_size, overlap=overlap, force=force
         )
@@ -980,9 +1062,10 @@ Status:
     ing.add_argument("--chunk-size", type=int, default=350, help="Woerter pro Chunk")
 
     # summarize
-    summ = sub.add_parser("summarize", help="LLM-Summarization (Haiku)")
+    summ = sub.add_parser("summarize", help="LLM-Summarization (Haiku or Flash)")
     summ.add_argument("--limit", "-l", type=int, default=10, help="Max Queue-Items")
     summ.add_argument("--delay", type=float, default=0.5, help="Pause zwischen Calls (s)")
+    summ.add_argument("--flash", action="store_true", help="Nutze Gemini 1.5 Flash")
 
     # enqueue
     sub.add_parser("enqueue", help="Skills+Wikis in Summarization-Queue")
@@ -994,6 +1077,10 @@ Status:
     sa = sub.add_parser("search-all", help="Unified Search (Skills+Wikis+Docs)")
     sa.add_argument("query")
     sa.add_argument("--limit", "-l", type=int, default=20)
+    
+    # deduplicate
+    de = sub.add_parser("deduplicate", help="Duplikate auf Festplatte suchen und in Papierkorb verschieben")
+    de.add_argument("-y", "--yes", action="store_true", help="Alle Duplikate automatisch loeschen ohne Nachfrage")
 
     args = parser.parse_args()
     kd = KnowledgeDigest()
@@ -1122,9 +1209,9 @@ Status:
                 chunk_size=args.chunk_size, recursive=args.recursive,
             )
         else:
-            # Default: data/inbox/
+            # Default: inbox aus Config
             result = kd.ingest(
-                _DEFAULT_DB.parent / "inbox",
+                kd._config.get_inbox_dir(),
                 archive=not args.no_archive,
                 chunk_size=args.chunk_size, recursive=args.recursive,
             )
@@ -1144,13 +1231,39 @@ Status:
             print(json.dumps(result, indent=2, ensure_ascii=False))
 
     elif args.cmd == "summarize":
-        result = kd.summarize(limit=args.limit, delay=args.delay)
-        print(f"Verarbeitet: {result.get('processed', 0)} | "
-              f"Fehler: {result.get('errors', 0)} | "
-              f"Dauer: {result.get('duration_ms', 0)}ms")
-        print(f"Tokens: {result.get('total_input_tokens', 0)} in / "
-              f"{result.get('total_output_tokens', 0)} out | "
-              f"Kosten: ~${result.get('estimated_cost_usd', 0)}")
+        if args.flash:
+            try:
+                from .gemini_flash_summarizer import GeminiFlashSummarizer
+            except ImportError:
+                from gemini_flash_summarizer import GeminiFlashSummarizer
+            import os
+            api_key = os.environ.get("GEMINI_API_KEY")
+            if not api_key:
+                print("FEHLER: GEMINI_API_KEY Umgebungsvariable nicht gesetzt!")
+                return
+            
+            # Da db_path als Eigenschaft vorliegt:
+            summarizer = GeminiFlashSummarizer(api_key, kd.db_path)
+            
+            limit = args.limit
+            if limit <= 0:
+                limit = 100
+                
+            result = summarizer.summarize_queue(limit=limit)
+            print(f"Verarbeitet: {result.get('processed', 0)} | "
+                  f"Fehler: {result.get('errors', 0)} | "
+                  f"Dauer: {result.get('duration_ms', 0)}ms")
+            print(f"Tokens: {result.get('total_input_tokens', 0)} in / "
+                  f"{result.get('total_output_tokens', 0)} out | "
+                  f"Kosten: ~${result.get('estimated_cost_usd', 0)}")
+        else:
+            result = kd.summarize(limit=args.limit, delay=args.delay)
+            print(f"Verarbeitet: {result.get('processed', 0)} | "
+                  f"Fehler: {result.get('errors', 0)} | "
+                  f"Dauer: {result.get('duration_ms', 0)}ms")
+            print(f"Tokens: {result.get('total_input_tokens', 0)} in / "
+                  f"{result.get('total_output_tokens', 0)} out | "
+                  f"Kosten: ~${result.get('estimated_cost_usd', 0)}")
 
     elif args.cmd == "enqueue":
         result = kd.enqueue_all()
@@ -1173,6 +1286,65 @@ Status:
             if r.get('snippet'):
                 print(f"    {r['snippet'][:120]}")
             print()
+            
+    elif args.cmd == "deduplicate":
+        conn = kd._get_conn()
+        try:
+            dups = conn.execute("""
+                SELECT content_hash, COUNT(*) as cnt 
+                FROM documents 
+                GROUP BY content_hash 
+                HAVING cnt > 1
+            """).fetchall()
+            
+            if not dups:
+                print("Keine Duplikate gefunden!")
+            else:
+                print(f"{len(dups)} Gruppen von Duplikaten gefunden.\n")
+                import shutil, os
+                from pathlib import Path
+                trash_dir = kd.db_path.parent / "_Papierkorb"
+                trash_dir.mkdir(parents=True, exist_ok=True)
+                
+                for row in dups:
+                    hash_val = row['content_hash']
+                    docs = conn.execute("SELECT id, file_path, filename FROM documents WHERE content_hash=? ORDER BY id", (hash_val,)).fetchall()
+                    print(f"\n--- Duplikat-Gruppe ({len(docs)} Dateien) ---")
+                    for i, d in enumerate(docs):
+                        print(f"  {i+1}: {d['file_path']}")
+                    
+                    if not args.yes:
+                        ans = input("Alle ab Datei 2 in den Papierkorb verschieben? (y/n): ")
+                        if ans.lower() != 'y':
+                            continue
+                            
+                    for d in docs[1:]:
+                        doc_id = d['id']
+                        file_path = d['file_path']
+                        print(f"-> Loesche: {file_path}")
+                        
+                        if os.path.exists(file_path):
+                            base_name = os.path.basename(file_path)
+                            trash_path = trash_dir / base_name
+                            counter = 1
+                            while trash_path.exists():
+                                name, ext = os.path.splitext(base_name)
+                                trash_path = trash_dir / f"{name}_{counter}{ext}"
+                                counter += 1
+                            try:
+                                shutil.move(file_path, trash_path)
+                            except Exception as e:
+                                print(f"  Fehler beim Verschieben: {e}")
+                        
+                        conn.execute("DELETE FROM summaries WHERE source_type='document' AND source_id=?", (doc_id,))
+                        conn.execute("DELETE FROM document_keywords WHERE doc_id=?", (doc_id,))
+                        conn.execute("DELETE FROM document_chunks WHERE doc_id=?", (doc_id,))
+                        conn.execute("DELETE FROM digest_queue WHERE source_type='document' AND source_id=?", (doc_id,))
+                        conn.execute("DELETE FROM documents WHERE id=?", (doc_id,))
+                        conn.commit()
+                print("\nDuplikat-Bereinigung abgeschlossen!")
+        finally:
+            conn.close()
 
     else:
         parser.print_help()

@@ -6,14 +6,12 @@ DONE.md
 
 # Internal analysis/operational docs
 BACH_INTEGRATION_GAP_ANALYSIS.md
+VALIDATION.md
 VALIDATION_REPORT_WISSENSDATENBANK.md
 
 # Personal operational scripts (not part of the public engine)
 process_batch_*.py
 batch_*.json
-gemini_*.json
-*_ingest.json
-gemini_flash_summarizer.py
 gemini_summary_v2.py
 haiku_batch.py
 ollama_batch.py
@@ -21,8 +19,6 @@ dedupe_fs.py
 empty_dirs.py
 viewer.py
 wissensdb.py
-zoll_station.py
-start.bat
 
 # Processing wave documentation (internal)
 welle*.md
@@ -34,6 +30,7 @@ _backup/
 
 # Python
 __pycache__/
+*.pyc
 *.py[cod]
 *.egg-info/
 dist/
@@ -42,6 +39,7 @@ build/
 # Runtime data
 data/
 *.db
+knowledgedigest.json
 
 # Virtual Environment
 .venv/
@@ -61,3 +59,6 @@ venv/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Server-spezifische Deployment-Scripts
+auto_ingest.py
