@@ -1,0 +1,53 @@
+# KnowledgeDigest
+
+> Portable SQLite knowledge database with LLM summarization for local document collections.
+
+Canonical repository: https://github.com/lukisch/knowledgedigest
+Owner: lukisch
+License: MIT
+Primary language: Python
+Runtime: Python 3.8+, standard library only
+
+## Summary
+
+KnowledgeDigest indexes large local document collections (PDF, DOCX, TXT, HTML, Markdown)
+into a fully-searchable SQLite database with FTS5. An LLM summarization queue (Claude Haiku)
+processes documents into structured 3–5 sentence summaries with keyword and domain tagging.
+Designed for offline-first, local-first use with BACH agent system integration.
+
+## Intended users
+
+- Researchers maintaining large personal document libraries
+- LLM agents that need a queryable local knowledge base before answering questions
+- Developers building document-aware AI assistants
+- Anyone who wants full-text search + LLM summaries over local files
+
+## Main interfaces
+
+- `python -m KnowledgeDigest ingest /path/to/docs --recursive` — ingest and index documents
+- `python -m KnowledgeDigest search-all "query"` — unified full-text search
+- `python -m KnowledgeDigest status` — DB statistics
+- `python -m KnowledgeDigest summarize --limit N` — LLM batch summarization
+- Python API: `from KnowledgeDigest import KnowledgeDigest`
+
+## Key files
+
+- `README.md`: human-facing overview, quickstart, architecture
+- `schema.py`: SQLite schema v3 (31 tables)
+- `digest.py`: main API class
+- `extractor.py`: text extraction (PDF, DOCX, TXT, HTML, MD)
+- `chunker.py`: sentence-boundary chunking (~500 tokens/chunk)
+- `summarizer.py`: LLM summarization via Haiku API
+- `indexer.py`: BACH skill indexer
+- `wiki_indexer.py`: BACH wiki indexer
+- `ingestor.py`: document ingestion pipeline
+- `requirements.txt`: dependencies
+
+## Search keywords
+
+local knowledge base, SQLite document index, LLM summarization, FTS5 search,
+offline-first knowledge management, document chunking, personal document search,
+PDF indexing, DOCX indexing, Claude Haiku batch processing, local-first AI,
+Python knowledge base, document understanding, semantic knowledge management
+
+## Last-checked: 2026-06-11

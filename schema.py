@@ -296,10 +296,11 @@ CREATE INDEX IF NOT EXISTS idx_queue_source ON digest_queue(source_type, source_
 
 def ensure_schema(db_path: Path) -> sqlite3.Connection:
     """Erstellt Schema falls noetig, gibt Connection zurueck."""
-    conn = sqlite3.connect(str(db_path))
+    conn = sqlite3.connect(str(db_path), timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
+    conn.execute("PRAGMA busy_timeout=30000")
     conn.executescript(SCHEMA_SQL)
     conn.execute(
         "INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('version', ?)",
