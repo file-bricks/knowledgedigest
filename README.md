@@ -150,7 +150,7 @@ All settings optional. Key settings:
 
 ## BACH Integration (Optional)
 
-KnowledgeDigest can optionally integrate with the [BACH](https://github.com/lukisch) agent system.
+KnowledgeDigest can optionally integrate with the [BACH](https://github.com/ellmos-ai/bach) agent system.
 When `bach_enabled: true` and `bach_db_path` is set, BACH skills and wiki articles
 are indexed alongside regular documents. This integration is lazy-loaded and has
 zero impact when disabled.

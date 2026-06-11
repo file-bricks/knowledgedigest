@@ -1,3 +1,5 @@
+## Last-checked: 2026-06-11
+
 # KnowledgeDigest
 
 KnowledgeDigest is a local-first Python tool for indexing documents into a portable SQLite/FTS5 knowledge database. It supports chunking, full-text search, optional LLM summaries, a PySide6 desktop GUI, a stdlib web viewer, CLI commands, and a Python API.
@@ -23,4 +25,24 @@ python -m KnowledgeDigest status
 
 Runtime data is local and ignored by Git: `data/`, `*.db`, and `knowledgedigest.json`.
 
-## Last-checked: 2026-06-11
+## Audience
+
+- **Local-first users** who want a portable, self-contained document knowledge base without cloud dependencies
+- **Python developers** building document-indexing, retrieval, or LLM-preprocessing pipelines
+- **AI engineers** needing an offline, privacy-preserving search backend for local LLM workflows
+- **Researchers and writers** managing large collections of PDFs, Markdown, DOCX, and text files
+- **Privacy-conscious teams** who need FTS5 full-text search without any data leaving the local machine
+
+## Search Phrases
+
+```
+portable knowledge database Python
+local document search FTS5 SQLite
+PySide6 knowledge base app
+local-first document indexing Python
+LLM document summarization local
+offline document search tool Python
+KnowledgeDigest
+file-bricks knowledgedigest
+knowledge base desktop GUI Python
+```

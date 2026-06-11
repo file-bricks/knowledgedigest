@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+- `llms.txt`: added `## Last-checked: 2026-06-11`, `## Audience` (5 groups), and `## Search Phrases` fenced code block (9 phrases).
+- `README.md`: corrected BACH Integration link (`github.com/lukisch` → `github.com/ellmos-ai/bach`).
+
+### Fixed
+- `TODO.md` removed from Git tracking and added to `.gitignore` (contained internal audit paths).
+
 ## 2026-06-06
 
 - Updated the test workflow to current `actions/checkout@v6` and `actions/setup-python@v6` majors.
