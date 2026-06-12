@@ -27,6 +27,9 @@ welle*.md
 _archive/
 _private/
 _backup/
+# Personal one-off script with private DB path/content (untracked 2026-06-12;
+# moved to scripts/_private/ -- note: old content remains in git history)
+scripts/create_summaries.py
 
 # Python
 __pycache__/
@@ -40,6 +43,7 @@ build/
 data/
 *.db
 knowledgedigest.json
+gemini_ingest.json
 
 # Virtual Environment
 .venv/
