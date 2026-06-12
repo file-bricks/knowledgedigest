@@ -13,3 +13,6 @@ PyMuPDF>=1.24.0
 
 # LLM Summarization (optional, nur für summarize-Befehl)
 anthropic>=0.79.0
+
+# Gemini Flash Summarization (optional, nur für summarize --flash)
+google-genai>=1.0.0

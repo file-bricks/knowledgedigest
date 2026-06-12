@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-KnowledgeDigest -- LLM Summarization via Google Gemini 1.5 Flash.
+KnowledgeDigest -- LLM Summarization via Google Gemini Flash.
 
 Verarbeitet Chunks aus der digest_queue mit extremer Geschwindigkeit.
+
+Das Modell ist konfigurierbar (Konstruktor-Parameter `model` oder
+Umgebungsvariable `GEMINI_MODEL`); Default: gemini-2.0-flash.
 
 Usage:
     from KnowledgeDigest.gemini_flash_summarizer import GeminiFlashSummarizer
@@ -20,9 +23,20 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 
-from .schema import ensure_schema
+try:
+    from .schema import ensure_schema
+except ImportError:  # script mode (python digest.py ...)
+    from schema import ensure_schema
 
-_MODEL = "gemini-1.5-flash"
+_DEFAULT_MODEL = "gemini-2.0-flash"
+
+# Price ESTIMATES in USD per million tokens (input, output) -- used only for
+# the cost report in summarize_queue(). Rates change; check
+# https://ai.google.dev/pricing for current values.
+_PRICES_PER_MTOK = {
+    "gemini-1.5-flash": (0.075, 0.30),
+    "gemini-2.0-flash": (0.10, 0.40),
+}
 
 _SYSTEM_PROMPT = """\
 Du bist ein Wissens-Analyst. Analysiere den folgenden Textabschnitt und erstelle eine strukturierte Zusammenfassung.
@@ -43,10 +57,12 @@ Regeln:
 """
 
 class GeminiFlashSummarizer:
-    def __init__(self, knowledge_db: Path, api_key: Optional[str] = None):
+    def __init__(self, knowledge_db: Path, api_key: Optional[str] = None,
+                 model: Optional[str] = None):
         self.knowledge_db = knowledge_db
         self._conn: Optional[sqlite3.Connection] = None
         self._api_key = api_key or os.environ.get('GEMINI_API_KEY')
+        self.model = model or os.environ.get('GEMINI_MODEL') or _DEFAULT_MODEL
         self._client = None
 
     def _get_conn(self) -> sqlite3.Connection:
@@ -141,7 +157,7 @@ class GeminiFlashSummarizer:
                         summary_result['summary'],
                         ','.join(summary_result.get('keywords', [])),
                         summary_result.get('domain', ''),
-                        _MODEL,
+                        self.model,
                         summary_result.get('input_tokens', 0),
                         summary_result.get('output_tokens', 0),
                     ))
@@ -172,9 +188,12 @@ class GeminiFlashSummarizer:
         elapsed = int((time.time() - start) * 1000)
         stats['duration_ms'] = elapsed
 
-        # Kosten-Schaetzung Flash (sehr viel guenstiger als Haiku)
-        input_cost = stats['total_input_tokens'] / 1_000_000 * 0.075
-        output_cost = stats['total_output_tokens'] / 1_000_000 * 0.30
+        # Cost ESTIMATE only -- per-model rates, fallback to default model
+        # rates for unknown models (see _PRICES_PER_MTOK note above).
+        in_rate, out_rate = _PRICES_PER_MTOK.get(
+            self.model, _PRICES_PER_MTOK[_DEFAULT_MODEL])
+        input_cost = stats['total_input_tokens'] / 1_000_000 * in_rate
+        output_cost = stats['total_output_tokens'] / 1_000_000 * out_rate
         stats['estimated_cost_usd'] = round(input_cost + output_cost, 6)
 
         return stats
@@ -196,7 +215,7 @@ class GeminiFlashSummarizer:
             from google.genai import types
             
             response = client.models.generate_content(
-                model=_MODEL,
+                model=self.model,
                 contents=text,
                 config=types.GenerateContentConfig(
                     system_instruction=_SYSTEM_PROMPT,

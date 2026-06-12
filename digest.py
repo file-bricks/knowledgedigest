@@ -1065,7 +1065,9 @@ Status:
     summ = sub.add_parser("summarize", help="LLM-Summarization (Haiku or Flash)")
     summ.add_argument("--limit", "-l", type=int, default=10, help="Max Queue-Items")
     summ.add_argument("--delay", type=float, default=0.5, help="Pause zwischen Calls (s)")
-    summ.add_argument("--flash", action="store_true", help="Nutze Gemini 1.5 Flash")
+    summ.add_argument("--flash", action="store_true",
+                      help="Nutze Gemini Flash (Default-Modell: gemini-2.0-flash, "
+                           "konfigurierbar via GEMINI_MODEL)")
 
     # enqueue
     sub.add_parser("enqueue", help="Skills+Wikis in Summarization-Queue")
