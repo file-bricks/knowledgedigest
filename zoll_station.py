@@ -18,6 +18,22 @@ import sys
 import subprocess
 from pathlib import Path
 
+
+def _require_script(path: Path) -> None:
+    """Abort with a clear error if an internal helper script is missing.
+
+    haiku_batch.py and gemini_summary.py are personal operational scripts
+    that are excluded from the public repo via .gitignore. Without them the
+    corresponding agent modes cannot run.
+    """
+    if not path.exists():
+        print(f"FEHLER: Benoetigtes Script fehlt: {path.name}")
+        print("Dieses Script ist ein internes Hilfsscript und nicht Teil des")
+        print("oeffentlichen Repos (siehe .gitignore). Ohne dieses Script ist")
+        print("dieser Agenten-Modus in diesem Checkout nicht verfuegbar.")
+        sys.exit(1)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Wissensdatenbank Zoll-Station")
     parser.add_argument("--agent", required=True, choices=["claude", "gemini", "flash"],
@@ -29,39 +45,43 @@ def main():
     
     script_dir = Path(__file__).parent
     wissensdb_script = script_dir / "digest.py"
-    haiku_script = script_dir / "haiku_batch.py"
-    gemini_offline_script = script_dir / "gemini_summary.py"
+    haiku_script = script_dir / "haiku_batch.py"  # internal, gitignored
 
-    print(f"=== 🛑 WILLKOMMEN AN DER ZOLL-STATION, AGENT '{args.agent.upper()}' ===")
-    
+    # ASCII-only output: avoids UnicodeEncodeError on Windows consoles
+    # (cp1252) when PYTHONIOENCODING=utf-8 is not set.
+    print(f"=== [ZOLL] WILLKOMMEN AN DER ZOLL-STATION, AGENT '{args.agent.upper()}' ===")
+
     if args.agent == "gemini":
         limit = args.limit or 100
         print(f"Agent Gemini identifiziert. Lade {limit} Chunks auf...")
-        
-        # Check für API Key
+
+        # Check fuer API Key
         if os.environ.get("GEMINI_API_KEY"):
             print("Status: GEMINI_API_KEY gefunden. Initiierung des Hyper-Flash-Modes (API).")
-            print("Führe API-Summarizer aus...\n")
+            print("Fuehre API-Summarizer aus...\n")
             subprocess.run([sys.executable, str(wissensdb_script), "summarize", "--flash", "--limit", str(limit)])
         else:
-            print("Status: Kein GEMINI_API_KEY gefunden. Keine Abkürzungen erlaubt. Manueller Übersetzungs-Zoll fällig!\n")
-            print("Generiere Schwarm-Prompt für manuelle Verarbeitung:\n")
+            print("Status: Kein GEMINI_API_KEY gefunden. Keine Abkuerzungen erlaubt. Manueller Uebersetzungs-Zoll faellig!\n")
+            print("Generiere Schwarm-Prompt fuer manuelle Verarbeitung:\n")
+            _require_script(haiku_script)
             subprocess.run([sys.executable, str(haiku_script), "prep", "--limit", str(limit), "--format", "prompt"])
-            print("\n✅ (Der Agent muss den Text lesen und die JSON-Resultate eigenständig einpflegen)")
+            print("\n[OK] (Der Agent muss den Text lesen und die JSON-Resultate eigenstaendig einpflegen)")
 
     elif args.agent == "claude":
         limit = args.limit or 20
-        print(f"Agent Claude identifiziert. Leite an den Haiku-Schwarm-Verteiler weiter für {limit} Dokumente...")
+        print(f"Agent Claude identifiziert. Leite an den Haiku-Schwarm-Verteiler weiter fuer {limit} Dokumente...")
         print("Generiere Schwarm-Prompt:\n")
+        _require_script(haiku_script)
         subprocess.run([sys.executable, str(haiku_script), "prep", "--limit", str(limit), "--format", "prompt"])
-        print("\n✅ (Der Agent muss den Prompt abarbeiten und via .db/haiku_batch.py ingest einspielen)")
-        
+        print("\n[OK] (Der Agent muss den Prompt abarbeiten und via .db/haiku_batch.py ingest einspielen)")
+
     elif args.agent == "flash":
         limit = args.limit or 15
-        print(f"Agent Flash (Standalone) identifiziert. Erstelle spezialisierten Prompt für {limit} Dokumente...")
-        # Flash nutzt vorerst den gleichen Prompt-Mechanismus wie Claude, aber wir könnten ihn optimieren.
+        print(f"Agent Flash (Standalone) identifiziert. Erstelle spezialisierten Prompt fuer {limit} Dokumente...")
+        # Flash uses the same prompt mechanism as Claude for now.
+        _require_script(haiku_script)
         subprocess.run([sys.executable, str(haiku_script), "prep", "--limit", str(limit), "--format", "prompt"])
-        print("\n✅ (Verwende system_instruction für den Prompt und spiele das JSON Resultat ein)")
+        print("\n[OK] (Verwende system_instruction fuer den Prompt und spiele das JSON Resultat ein)")
 
 if __name__ == "__main__":
     main()
