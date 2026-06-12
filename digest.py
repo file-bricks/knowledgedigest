@@ -1240,10 +1240,12 @@ Status:
             api_key = os.environ.get("GEMINI_API_KEY")
             if not api_key:
                 print("FEHLER: GEMINI_API_KEY Umgebungsvariable nicht gesetzt!")
-                return
-            
-            # Da db_path als Eigenschaft vorliegt:
-            summarizer = GeminiFlashSummarizer(api_key, kd.db_path)
+                kd.close()
+                return 1
+
+            # Signature is (knowledge_db, api_key) -- pass api_key by keyword
+            # to avoid the swapped-argument bug (see TODO audit 2026-06-12).
+            summarizer = GeminiFlashSummarizer(kd.db_path, api_key=api_key)
             
             limit = args.limit
             if limit <= 0:
