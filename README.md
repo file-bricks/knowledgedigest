@@ -177,6 +177,10 @@ not be committed.
 - **Deduplication CLI**: Added `python -m KnowledgeDigest deduplicate` to identify cryptographic duplicates and auto-clean DB and filesystem.
 - **Summary Reset**: Added a Web Viewer button to trash faulty summaries and place standard documents back into pending queue.
 
+## See Also: WikiStub-Seed
+
+[WikiStub-Seed](https://github.com/dev-bricks/WikiStub-Seed) is a related knowledge dataset from the dev-bricks org: 630 multilingual stub articles across 12 domains (DE/EN + es/ja/ru/zh), deployable as a self-contained wiki module. Useful as a structured seed corpus for KnowledgeDigest indexing workflows.
+
 ## See Also: ProFiler
 
 Need PDF encryption, OCR, anonymization, or file versioning? Check out [ProFiler](https://github.com/file-bricks/ProFiler) -- a professional file management suite from the same author.
