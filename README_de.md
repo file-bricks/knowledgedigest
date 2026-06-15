@@ -1,7 +1,15 @@
+<img src="assets/banner.svg" width="100%" alt="KnowledgeDigest Banner">
+
 # KnowledgeDigest — Portable Wissensdatenbank mit LLM-Vorverarbeitung
 
-> Eigenständige SQLite-basierte Wissensdatenbank. Dokumente ablegen, automatisch indexieren,
-> per LLM (Haiku) zusammenfassen und in einer volltextdurchsuchbaren Datenbank speichern.
+[English](README.md) | **[Deutsch](README_de.md)**
+
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
+[![Lizenz: MIT](https://img.shields.io/badge/Lizenz-MIT-yellow.svg)](LICENSE)
+[![SQLite FTS5](https://img.shields.io/badge/Suche-FTS5-green.svg)]()
+
+> Eigenständige SQLite-basierte Wissensdatenbank. Dokumente ablegen, automatisch indexieren, per LLM (Haiku) zusammenfassen und volltextdurchsuchbar speichern.
+
 
 ---
 

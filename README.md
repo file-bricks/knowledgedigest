@@ -1,10 +1,16 @@
-# KnowledgeDigest -- Portable Knowledge Database
+<img src="assets/banner.svg" width="100%" alt="KnowledgeDigest Banner">
 
-A portable, self-contained knowledge database that indexes documents, chunks them,
-and makes them searchable via FTS5 full-text search. Optionally summarizes chunks
-with LLM (Haiku). Two frontends: **PySide6 Desktop GUI** and **Web Viewer**.
+# KnowledgeDigest — Portable Knowledge Database
 
-## Quick Start
+**[Deutsch](README_de.md)** | [English](README.md)
+
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![SQLite FTS5](https://img.shields.io/badge/search-FTS5-green.svg)]()
+
+> Portable, self-contained knowledge database — indexes documents, chunks them, and makes them searchable via FTS5. Optional LLM summarization. PySide6 GUI + Web Viewer.
+
+
 
 ```bash
 git clone https://github.com/file-bricks/knowledgedigest
@@ -24,9 +30,6 @@ python -m KnowledgeDigest status
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![SQLite FTS5](https://img.shields.io/badge/search-FTS5-green.svg)]()
-
----
 
 🇩🇪 [Deutsche Dokumentation → README_de.md](README_de.md)
 

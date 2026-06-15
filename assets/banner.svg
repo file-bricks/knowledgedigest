@@ -1,0 +1,294 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 340" width="100%" height="100%">
+  <defs>
+    <!-- Fonts and CSS Styles -->
+    <style type="text/css">
+      <![CDATA[
+      @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
+      
+      .font-outfit {
+        font-family: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+      
+      @keyframes pulse-opacity {
+        0%, 100% { opacity: 0.3; }
+        50% { opacity: 1; }
+      }
+      
+      @keyframes flow {
+        to {
+          stroke-dashoffset: -30;
+        }
+      }
+      
+      @keyframes float-y {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-8px); }
+      }
+      
+      .pulse-dot {
+        animation: pulse-opacity 3s infinite ease-in-out;
+      }
+      .pulse-dot-delayed {
+        animation: pulse-opacity 3s infinite ease-in-out;
+        animation-delay: 1.5s;
+      }
+      
+      .data-stream {
+        stroke-dasharray: 6, 6;
+        stroke-dashoffset: 30;
+        animation: flow 2s infinite linear;
+      }
+      
+      .floating-particle-1 {
+        animation: float-y 4s infinite ease-in-out;
+      }
+      .floating-particle-2 {
+        animation: float-y 5s infinite ease-in-out;
+        animation-delay: 1.5s;
+      }
+      .floating-particle-3 {
+        animation: float-y 6s infinite ease-in-out;
+        animation-delay: 3s;
+      }
+      ]]>
+    </style>
+
+    <!-- Filters for Glow Effects -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="5" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    
+    <filter id="glow-strong" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Background Gradients -->
+    <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#080B11" />
+      <stop offset="50%" stop-color="#0F131E" />
+      <stop offset="100%" stop-color="#05070B" />
+    </linearGradient>
+    
+    <linearGradient id="border-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3B82F6" />
+      <stop offset="30%" stop-color="#1E293B" />
+      <stop offset="70%" stop-color="#1E293B" />
+      <stop offset="100%" stop-color="#8B5CF6" />
+    </linearGradient>
+
+    <!-- Tech Grid Pattern -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1E293B" stroke-width="1" stroke-opacity="0.4"/>
+    </pattern>
+
+    <!-- Backdrop Glows -->
+    <radialGradient id="glow-left" cx="240" cy="180" r="180">
+      <stop offset="0%" stop-color="#6366F1" stop-opacity="0.25" />
+      <stop offset="50%" stop-color="#8B5CF6" stop-opacity="0.08" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+    
+    <radialGradient id="glow-right" cx="800" cy="170" r="250">
+      <stop offset="0%" stop-color="#3B82F6" stop-opacity="0.15" />
+      <stop offset="60%" stop-color="#8B5CF6" stop-opacity="0.03" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+
+    <radialGradient id="glow-right-fuchsia" cx="1000" cy="140" r="150">
+      <stop offset="0%" stop-color="#EC4899" stop-opacity="0.12" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Book & Pages Gradients -->
+    <linearGradient id="page-grad-left" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0B0F19" />
+      <stop offset="70%" stop-color="#1E293B" />
+      <stop offset="100%" stop-color="#4F46E5" />
+    </linearGradient>
+    
+    <linearGradient id="page-grad-right" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#4F46E5" />
+      <stop offset="30%" stop-color="#1E293B" />
+      <stop offset="100%" stop-color="#0B0F19" />
+    </linearGradient>
+    
+    <linearGradient id="book-light-ray" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#6366F1" stop-opacity="0.25" />
+      <stop offset="100%" stop-color="#6366F1" stop-opacity="0" />
+    </linearGradient>
+
+    <!-- Bulb Gradients -->
+    <radialGradient id="bulb-fill" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#60A5FA" stop-opacity="0.15" />
+      <stop offset="100%" stop-color="#60A5FA" stop-opacity="0" />
+    </radialGradient>
+    
+    <linearGradient id="bulb-stroke" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#60A5FA" />
+      <stop offset="50%" stop-color="#3B82F6" />
+      <stop offset="100%" stop-color="#1D4ED8" />
+    </linearGradient>
+
+    <!-- Brain Gradients -->
+    <radialGradient id="brain-left-glow" cx="40%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#EC4899" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#8B5CF6" stop-opacity="0.3" />
+    </radialGradient>
+    
+    <radialGradient id="brain-right-glow" cx="60%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#EC4899" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#6366F1" stop-opacity="0.3" />
+    </radialGradient>
+
+    <!-- Data Stream Gradients -->
+    <linearGradient id="stream-grad-1" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3B82F6" stop-opacity="0.1" />
+      <stop offset="50%" stop-color="#60A5FA" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#8B5CF6" stop-opacity="0.1" />
+    </linearGradient>
+    
+    <linearGradient id="stream-grad-2" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#EC4899" stop-opacity="0.1" />
+      <stop offset="50%" stop-color="#F472B6" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#3B82F6" stop-opacity="0.1" />
+    </linearGradient>
+
+    <!-- Text & Badge Gradients -->
+    <linearGradient id="text-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3B82F6" />
+      <stop offset="50%" stop-color="#8B5CF6" />
+      <stop offset="100%" stop-color="#EC4899" />
+    </linearGradient>
+    
+    <linearGradient id="badge-border-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#4F46E5" />
+      <stop offset="100%" stop-color="#06B6D4" />
+    </linearGradient>
+  </defs>
+
+  <!-- Background Rect with Border -->
+  <rect x="1" y="1" width="1198" height="338" rx="19" fill="url(#bg-gradient)" stroke="url(#border-gradient)" stroke-width="2"/>
+
+  <!-- Tech Grid Background -->
+  <rect x="2" y="2" width="1196" height="336" rx="18" fill="url(#grid)" opacity="0.4"/>
+
+  <!-- Glowing Backdrops -->
+  <circle cx="240" cy="180" r="180" fill="url(#glow-left)"/>
+  <circle cx="800" cy="170" r="250" fill="url(#glow-right)"/>
+  <circle cx="1000" cy="140" r="120" fill="url(#glow-right-fuchsia)" filter="url(#glow-strong)"/>
+
+  <!-- ================= LEFT AREA: MOTIF ================= -->
+
+  <!-- Book Light Ray (Volumetric Glow) -->
+  <polygon points="130,205 180,80 300,80 350,205" fill="url(#book-light-ray)" style="mix-blend-mode: screen;"/>
+
+  <!-- Data Streams (flowing information) -->
+  <path d="M 160 210 C 160 170, 210 180, 225 170" fill="none" stroke="url(#stream-grad-1)" stroke-width="2" class="data-stream" />
+  <path d="M 200 220 C 200 185, 220 180, 230 170" fill="none" stroke="url(#stream-grad-2)" stroke-width="1.5" class="data-stream" style="animation-delay: 0.5s;" />
+  <path d="M 320 210 C 320 170, 270 180, 255 170" fill="none" stroke="url(#stream-grad-1)" stroke-width="2" class="data-stream" style="animation-delay: 1.0s;" />
+  <path d="M 280 220 C 280 185, 260 180, 250 170" fill="none" stroke="url(#stream-grad-2)" stroke-width="1.5" class="data-stream" style="animation-delay: 1.5s;" />
+
+  <!-- Floating Knowledge Particles -->
+  <circle cx="190" cy="110" r="3" fill="#60A5FA" opacity="0.6" class="floating-particle-1" />
+  <circle cx="290" cy="120" r="4" fill="#EC4899" opacity="0.5" class="floating-particle-2" />
+  <circle cx="210" cy="75" r="3" fill="#8B5CF6" opacity="0.6" class="floating-particle-3" />
+  <circle cx="270" cy="80" r="2" fill="#3B82F6" opacity="0.7" class="floating-particle-1" />
+  <circle cx="240" cy="68" r="3.5" fill="#F472B6" opacity="0.5" class="floating-particle-2" />
+
+  <!-- The Open Book Cover -->
+  <path d="M 126 210 L 126 262 C 166 277, 196 282, 238 272" fill="none" stroke="#312E81" stroke-width="3" stroke-linecap="round"/>
+  <path d="M 354 210 L 354 262 C 314 277, 284 282, 242 272" fill="none" stroke="#312E81" stroke-width="3" stroke-linecap="round"/>
+  <path d="M 240 265 L 240 275" fill="none" stroke="#4F46E5" stroke-width="3" stroke-linecap="round"/>
+
+  <!-- Left book page lines (depth) -->
+  <path d="M 130 258 C 170 273, 200 278, 240 268" stroke="#1E1B4B" stroke-width="2" fill="none"/>
+  <path d="M 130 261 C 170 276, 200 281, 240 271" stroke="#0F172A" stroke-width="2" fill="none"/>
+
+  <!-- Right book page lines (depth) -->
+  <path d="M 350 258 C 310 273, 280 278, 240 268" stroke="#1E1B4B" stroke-width="2" fill="none"/>
+  <path d="M 350 261 C 310 276, 280 281, 240 271" stroke="#0F172A" stroke-width="2" fill="none"/>
+
+  <!-- Left book page surface -->
+  <path d="M 240 215 C 200 225, 170 220, 130 205 L 130 255 C 170 270, 200 275, 240 265 Z" fill="url(#page-grad-left)"/>
+  
+  <!-- Right book page surface -->
+  <path d="M 240 215 C 280 225, 310 220, 350 205 L 350 255 C 310 270, 280 275, 240 265 Z" fill="url(#page-grad-right)"/>
+
+  <!-- Book Pages Glowing Top Highlights -->
+  <path d="M 240 215 C 200 225, 170 220, 130 205" fill="none" stroke="#818CF8" stroke-width="1.5" stroke-linecap="round" />
+  <path d="M 240 215 C 280 225, 310 220, 350 205" fill="none" stroke="#818CF8" stroke-width="1.5" stroke-linecap="round" />
+
+  <!-- Bulb filament mount -->
+  <path d="M 235 180 L 235 155 M 245 180 L 245 155" stroke="#334155" stroke-width="1.5"/>
+
+  <!-- Bulb base / screw thread -->
+  <path d="M 225 180 L 255 180" stroke="#475569" stroke-width="4" stroke-linecap="round"/>
+  <path d="M 227 186 L 253 186" stroke="#475569" stroke-width="4" stroke-linecap="round"/>
+  <path d="M 230 192 L 250 192" stroke="#475569" stroke-width="4" stroke-linecap="round"/>
+  <path d="M 235 196 C 235 198, 245 198, 245 196 Z" fill="#1E293B"/>
+
+  <!-- Brain Silhouette (Backdrop fill) -->
+  <path d="M 238 90 C 210 90, 195 105, 195 125 C 195 140, 208 152, 222 152 C 228 152, 238 145, 238 135 Z" fill="url(#brain-left-glow)" opacity="0.55" filter="url(#glow)"/>
+  <path d="M 242 90 C 270 90, 285 105, 285 125 C 285 140, 272 152, 258 152 C 252 152, 242 145, 242 135 Z" fill="url(#brain-right-glow)" opacity="0.55" filter="url(#glow)"/>
+
+  <!-- Symmetrical Brain Neon Circuit Paths -->
+  <!-- Left Side -->
+  <path d="M 236 94 C 214 94, 200 108, 200 125 C 200 138, 210 147, 222 147 C 228 147, 236 140, 236 132" fill="none" stroke="#F472B6" stroke-width="2" stroke-linecap="round" filter="url(#glow)"/>
+  <path d="M 236 112 C 220 112, 210 120, 210 130 C 210 136, 216 140, 222 140 C 226 140, 230 136, 230 132" fill="none" stroke="#C084FC" stroke-width="1.8" stroke-linecap="round" filter="url(#glow)"/>
+  <path d="M 226 102 C 216 106, 214 116, 216 122" fill="none" stroke="#818CF8" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Right Side -->
+  <path d="M 244 94 C 266 94, 280 108, 280 125 C 280 138, 270 147, 258 147 C 252 147, 244 140, 244 132" fill="none" stroke="#F472B6" stroke-width="2" stroke-linecap="round" filter="url(#glow)"/>
+  <path d="M 244 112 C 260 112, 270 120, 270 130 C 270 136, 264 140, 258 140 C 254 140, 250 136, 250 132" fill="none" stroke="#C084FC" stroke-width="1.8" stroke-linecap="round" filter="url(#glow)"/>
+  <path d="M 254 102 C 264 106, 266 116, 264 122" fill="none" stroke="#818CF8" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Neural Synapse Glowing Dots -->
+  <circle cx="215" cy="102" r="3" fill="#FFF" filter="url(#glow)" class="pulse-dot" />
+  <circle cx="200" cy="125" r="3" fill="#FFF" filter="url(#glow)" class="pulse-dot-delayed" />
+  <circle cx="222" cy="147" r="3" fill="#FFF" filter="url(#glow)" class="pulse-dot" />
+  <circle cx="236" cy="112" r="2.5" fill="#FFF" filter="url(#glow)" class="pulse-dot-delayed" />
+  <circle cx="265" cy="102" r="3" fill="#FFF" filter="url(#glow)" class="pulse-dot-delayed" />
+  <circle cx="280" cy="125" r="3" fill="#FFF" filter="url(#glow)" class="pulse-dot" />
+  <circle cx="258" cy="147" r="3" fill="#FFF" filter="url(#glow)" class="pulse-dot-delayed" />
+  <circle cx="244" cy="112" r="2.5" fill="#FFF" filter="url(#glow)" class="pulse-dot" />
+
+  <!-- Bulb Outer Glass Outline -->
+  <path d="M 215 155 C 185 130, 185 85, 240 85 C 295 85, 295 130, 265 155 C 255 165, 255 178, 255 180 L 225 180 C 225 178, 225 165, 215 155 Z" 
+        fill="url(#bulb-fill)" stroke="url(#bulb-stroke)" stroke-width="2.5" filter="url(#glow)"/>
+
+
+  <!-- ================= RIGHT AREA: WORDMARK & TAGLINE ================= -->
+
+  <!-- Pill Badge -->
+  <rect x="460" y="80" width="162" height="28" rx="14" fill="#1E293B" fill-opacity="0.4" stroke="url(#badge-border-gradient)" stroke-width="1.5"/>
+  <text x="541" y="97" fill="#818CF8" font-size="11px" font-weight="700" letter-spacing="1.5px" text-anchor="middle" class="font-outfit">LOCAL-FIRST SYSTEM</text>
+
+  <!-- Wordmark -->
+  <text x="460" y="190" class="font-outfit" font-size="72px" letter-spacing="-1.5px" text-rendering="geometricPrecision">
+    <tspan fill="#FFFFFF" font-weight="800">Knowledge</tspan><tspan fill="url(#text-gradient)" font-weight="800">Digest</tspan>
+  </text>
+
+  <!-- Tagline -->
+  <text x="460" y="235" class="font-outfit" font-size="22px" font-weight="500" fill="#94A3B8" letter-spacing="4px" text-rendering="geometricPrecision">PORTABLE KNOWLEDGE DATABASE</text>
+
+  <!-- Feature list -->
+  <g transform="translate(460, 275)" class="font-outfit" font-size="12px" font-weight="600" fill="#64748B" letter-spacing="1.5px">
+    <!-- Feature 1 -->
+    <circle cx="5" cy="-4" r="3" fill="#6366F1"/>
+    <text x="16" y="0">LOCAL-FIRST STORAGE</text>
+    <!-- Feature 2 -->
+    <circle cx="225" cy="-4" r="3" fill="#8B5CF6"/>
+    <text x="236" y="0">MARKDOWN SYNC</text>
+    <!-- Feature 3 -->
+    <circle cx="415" cy="-4" r="3" fill="#EC4899"/>
+    <text x="426" y="0">AI-POWERED INSIGHTS</text>
+  </g>
+
+</svg>
