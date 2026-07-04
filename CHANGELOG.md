@@ -2,7 +2,14 @@
 
 ## [Unreleased]
 
+### Security
+- Web viewer: state-changing routes (`/open/`, `/api/reset_doc/`, `/api/delete_file/`) are now POST-only (405 on GET — previously a simple `<img src>` GET could delete files), with a Host-header gate against DNS rebinding and an Origin/Referer gate against CSRF (empty Origin stays allowed so local CLI tools like curl keep working). Regression tests in `tests/test_web_viewer_security.py`.
+- Web viewer: FTS5 search snippets are now HTML-escaped before `<mark>` highlighting is re-inserted (stored XSS via indexed document content).
+
 ### Changed
+- Config discovery now honors `$XDG_CONFIG_HOME`/`~/.config/knowledgedigest/` on Linux/macOS (as the README already promised) and skips an empty `%APPDATA%`.
+- The `summarize_model` config key is now passed through to the summarizer (was previously ignored).
+- Server-specific deployment scripts removed from the public repository (kept privately).
 - `llms.txt`: added `## Last-checked: 2026-06-11`, `## Audience` (5 groups), and `## Search Phrases` fenced code block (9 phrases).
 - `README.md`: corrected BACH Integration link (`github.com/lukisch` → `github.com/ellmos-ai/bach`).
 

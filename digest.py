@@ -82,7 +82,10 @@ class KnowledgeDigest:
         self._indexer = None  # Lazy init (BACH optional)
         self._wiki_indexer = None  # Lazy init (BACH optional)
         self._ingestor = DocumentIngestor(self.db_path, config=self._config)
-        self._summarizer = Summarizer(self.db_path)
+        # summarize_model aus der Config durchreichen (war toter Schluessel;
+        # None/leer -> Summarizer nutzt sein Provider-Default)
+        self._summarizer = Summarizer(
+            self.db_path, model=self._config.get("summarize_model") or None)
 
     def _get_conn(self) -> sqlite3.Connection:
         """Oeffnet DB-Connection mit Schema-Sicherstellung."""

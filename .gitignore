@@ -66,3 +66,10 @@ desktop.ini
 
 # Server-spezifische Deployment-Scripts
 auto_ingest.py
+
+# Server-spezifische Deployment-Scripts (privat)
+scripts/patch_webviewer.py
+scripts/process_summaries.py
+
+# Multi-Agent Lock-System (lokal, nie committen)
+LOCK*.txt

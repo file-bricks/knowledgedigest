@@ -80,8 +80,15 @@ class Config:
         candidates = [
             Path.cwd() / CONFIG_FILENAME,
             _DATA_DIR / CONFIG_FILENAME,
-            Path(os.environ.get("APPDATA", "")) / "KnowledgeDigest" / CONFIG_FILENAME,
         ]
+        appdata = os.environ.get("APPDATA", "")
+        if appdata:
+            candidates.append(Path(appdata) / "KnowledgeDigest" / CONFIG_FILENAME)
+        # Linux/macOS: XDG-Pfad (README versprach ihn schon laenger)
+        xdg = os.environ.get("XDG_CONFIG_HOME", "")
+        candidates.append(
+            (Path(xdg) if xdg else Path.home() / ".config")
+            / "knowledgedigest" / CONFIG_FILENAME)
         for p in candidates:
             if p.exists():
                 return p

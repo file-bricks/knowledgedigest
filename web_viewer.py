@@ -303,7 +303,7 @@ def page_doc(db_path, doc_id):
     </div></div>
     <script>
     function openFile(docId) {{
-        fetch('/open/' + docId).then(r => r.json())
+        fetch('/open/' + docId, {{method: 'POST'}}).then(r => r.json())
             .then(data => {{ if (!data.ok) alert('Fehler: ' + data.error); }})
             .catch(e => alert('Fehler: ' + e));
     }}
@@ -373,7 +373,7 @@ def page_search(db_path, query="", limit=30):
         try:
             rows = conn.execute(
                 "SELECT d.id, d.filename, d.file_type, d.word_count, "
-                "snippet(document_fts, 1, '<mark>', '</mark>', '...', 30) as snippet "
+                "snippet(document_fts, 1, char(1), char(2), '...', 30) as snippet "
                 "FROM document_fts JOIN document_chunks dc ON document_fts.rowid = dc.id "
                 "JOIN documents d ON dc.doc_id = d.id "
                 "WHERE document_fts MATCH ? ORDER BY document_fts.rank LIMIT ?",
@@ -396,7 +396,10 @@ def page_search(db_path, query="", limit=30):
                 if r["id"] in seen:
                     continue
                 seen.add(r["id"])
-                snippet = r["snippet"] or ""
+                # XSS-Schutz: Dokumentinhalt escapen, erst DANACH die
+                # char(1)/char(2)-Platzhalter zu <mark>-Tags machen
+                snippet = _esc(r["snippet"] or "").replace(
+                    "\x01", "<mark>").replace("\x02", "</mark>")
                 body += f"""<div class="card">
                     <a href="/doc/{r['id']}"><strong>{_esc(r['filename'])}</strong></a>
                     <span class="badge badge-blue" style="margin-left:8px">{_esc(r['file_type'])}</span>
@@ -443,7 +446,44 @@ def page_folders(db_path):
 class ViewerHandler(BaseHTTPRequestHandler):
     db_path = None
 
+    # ── Sicherheits-Gates (Review 2026-07-04) ────────────────────
+    # Der Server bindet nur an 127.0.0.1, aber ohne Host-Check kann eine
+    # boesartige Webseite per DNS-Rebinding lesen und ohne Methoden-/
+    # Origin-Check per <img src>/Form-POST loeschen (CSRF).
+
+    def _host_allowed(self):
+        host = self.headers.get("Host") or ""
+        if "\r" in host or "\n" in host:
+            return False
+        port = self.server.server_port
+        return host in (
+            f"127.0.0.1:{port}", f"localhost:{port}", f"[::1]:{port}",
+            "127.0.0.1", "localhost", "[::1]",
+        )
+
+    def _ensure_host_allowed(self):
+        if self._host_allowed():
+            return True
+        self._respond(403, json.dumps({"ok": False, "error": "Forbidden host"}),
+                      "application/json")
+        return False
+
+    def _origin_allowed(self):
+        """POST-CSRF-Schutz: Origin/Referer muss loopback sein (oder fehlen,
+        damit lokale CLI-Tools wie curl weiter funktionieren — Browser senden
+        bei Cross-Origin-POSTs immer einen Origin-Header)."""
+        origin = self.headers.get("Origin") or self.headers.get("Referer") or ""
+        if not origin:
+            return True
+        try:
+            host = urllib.parse.urlparse(origin).hostname
+        except Exception:
+            return False
+        return host in ("127.0.0.1", "localhost", "::1")
+
     def do_GET(self):
+        if not self._ensure_host_allowed():
+            return
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         params = urllib.parse.parse_qs(parsed.query)
@@ -469,61 +509,11 @@ class ViewerHandler(BaseHTTPRequestHandler):
                 content = self._api_status()
                 self._respond(200, content, "application/json")
                 return
-            elif path.startswith("/open/"):
-                doc_id = int(path.split("/open/")[1])
-                result = self._open_file(doc_id)
-                self._respond(200, json.dumps(result), "application/json")
-                return
-            elif path.startswith("/api/reset_doc/"):
-                doc_id = int(path.split("/api/reset_doc/")[1])
-                conn = _get_conn(self.db_path)
-                try:
-                    conn.execute("DELETE FROM summaries WHERE source_type='document' AND source_id=?", (doc_id,))
-                    conn.execute("UPDATE digest_queue SET status='pending', error_msg=NULL WHERE source_type='document' AND source_id=?", (doc_id,))
-                    conn.commit()
-                    self._respond(200, json.dumps({"ok": True}), "application/json")
-                except Exception as e:
-                    self._respond(500, json.dumps({"ok": False, "error": str(e)}), "application/json")
-                finally:
-                    conn.close()
-                return
-            elif path.startswith("/api/delete_file/"):
-                doc_id = int(path.split("/api/delete_file/")[1])
-                conn = _get_conn(self.db_path)
-                try:
-                    doc = conn.execute("SELECT file_path FROM documents WHERE id=?", (doc_id,)).fetchone()
-                    if doc:
-                        import shutil, os
-                        from pathlib import Path
-                        file_path = doc['file_path']
-                        trash_dir = Path(self.db_path).parent / "_Papierkorb"
-                        trash_dir.mkdir(parents=True, exist_ok=True)
-                        if os.path.exists(file_path):
-                            base_name = os.path.basename(file_path)
-                            trash_path = trash_dir / base_name
-                            counter = 1
-                            while trash_path.exists():
-                                name, ext = os.path.splitext(base_name)
-                                trash_path = trash_dir / f"{name}_{counter}{ext}"
-                                counter += 1
-                            try:
-                                shutil.move(file_path, str(trash_path))
-                            except Exception as e:
-                                print(f"Move Error: {e}")
-                        
-                        conn.execute("DELETE FROM summaries WHERE source_type='document' AND source_id=?", (doc_id,))
-                        conn.execute("DELETE FROM document_keywords WHERE doc_id=?", (doc_id,))
-                        conn.execute("DELETE FROM document_chunks WHERE doc_id=?", (doc_id,))
-                        conn.execute("DELETE FROM digest_queue WHERE source_type='document' AND source_id=?", (doc_id,))
-                        conn.execute("DELETE FROM documents WHERE id=?", (doc_id,))
-                        conn.commit()
-                        self._respond(200, json.dumps({"ok": True}), "application/json")
-                    else:
-                        self._respond(404, json.dumps({"ok": False, "error": "Doc not found"}), "application/json")
-                except Exception as e:
-                    self._respond(500, json.dumps({"ok": False, "error": str(e)}), "application/json")
-                finally:
-                    conn.close()
+            elif path.startswith(("/open/", "/api/reset_doc/", "/api/delete_file/")):
+                # Zustandsaendernde Routen sind POST-only (Review 2026-07-04:
+                # vorher loeste bereits ein <img src>-GET die Loeschung aus)
+                self._respond(405, json.dumps(
+                    {"ok": False, "error": "POST required"}), "application/json")
                 return
             else:
                 content = _layout('<div class="card">404 - Seite nicht gefunden</div>', "dash", self.db_path)
@@ -534,8 +524,80 @@ class ViewerHandler(BaseHTTPRequestHandler):
             self._respond(500, content)
 
     def do_POST(self):
-        """Alle POST-Requests einfach an do_GET delegieren."""
-        self.do_GET()
+        """Zustandsaendernde Routen — POST-only, mit Host- und Origin-Gate."""
+        if not self._ensure_host_allowed():
+            return
+        if not self._origin_allowed():
+            self._respond(403, json.dumps(
+                {"ok": False, "error": "Forbidden origin"}), "application/json")
+            return
+        path = urllib.parse.urlparse(self.path).path
+        try:
+            if path.startswith("/open/"):
+                doc_id = int(path.split("/open/")[1])
+                result = self._open_file(doc_id)
+                self._respond(200, json.dumps(result), "application/json")
+            elif path.startswith("/api/reset_doc/"):
+                doc_id = int(path.split("/api/reset_doc/")[1])
+                self._reset_doc(doc_id)
+            elif path.startswith("/api/delete_file/"):
+                doc_id = int(path.split("/api/delete_file/")[1])
+                self._delete_file(doc_id)
+            else:
+                self._respond(404, json.dumps(
+                    {"ok": False, "error": "Unknown POST endpoint"}), "application/json")
+        except Exception as e:
+            self._respond(500, json.dumps(
+                {"ok": False, "error": str(e)}), "application/json")
+
+    def _reset_doc(self, doc_id):
+        conn = _get_conn(self.db_path)
+        try:
+            conn.execute("DELETE FROM summaries WHERE source_type='document' AND source_id=?", (doc_id,))
+            conn.execute("UPDATE digest_queue SET status='pending', error_msg=NULL WHERE source_type='document' AND source_id=?", (doc_id,))
+            conn.commit()
+            self._respond(200, json.dumps({"ok": True}), "application/json")
+        except Exception as e:
+            self._respond(500, json.dumps({"ok": False, "error": str(e)}), "application/json")
+        finally:
+            conn.close()
+
+    def _delete_file(self, doc_id):
+        conn = _get_conn(self.db_path)
+        try:
+            doc = conn.execute("SELECT file_path FROM documents WHERE id=?", (doc_id,)).fetchone()
+            if doc:
+                import shutil, os
+                from pathlib import Path
+                file_path = doc['file_path']
+                trash_dir = Path(self.db_path).parent / "_Papierkorb"
+                trash_dir.mkdir(parents=True, exist_ok=True)
+                if os.path.exists(file_path):
+                    base_name = os.path.basename(file_path)
+                    trash_path = trash_dir / base_name
+                    counter = 1
+                    while trash_path.exists():
+                        name, ext = os.path.splitext(base_name)
+                        trash_path = trash_dir / f"{name}_{counter}{ext}"
+                        counter += 1
+                    try:
+                        shutil.move(file_path, str(trash_path))
+                    except Exception as e:
+                        print(f"Move Error: {e}")
+
+                conn.execute("DELETE FROM summaries WHERE source_type='document' AND source_id=?", (doc_id,))
+                conn.execute("DELETE FROM document_keywords WHERE doc_id=?", (doc_id,))
+                conn.execute("DELETE FROM document_chunks WHERE doc_id=?", (doc_id,))
+                conn.execute("DELETE FROM digest_queue WHERE source_type='document' AND source_id=?", (doc_id,))
+                conn.execute("DELETE FROM documents WHERE id=?", (doc_id,))
+                conn.commit()
+                self._respond(200, json.dumps({"ok": True}), "application/json")
+            else:
+                self._respond(404, json.dumps({"ok": False, "error": "Doc not found"}), "application/json")
+        except Exception as e:
+            self._respond(500, json.dumps({"ok": False, "error": str(e)}), "application/json")
+        finally:
+            conn.close()
 
     def _open_file(self, doc_id):
         conn = _get_conn(self.db_path)
