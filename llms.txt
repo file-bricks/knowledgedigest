@@ -1,4 +1,4 @@
-## Last-checked: 2026-06-11
+## Last-checked: 2026-07-06
 
 # KnowledgeDigest
 
@@ -44,5 +44,7 @@ LLM document summarization local
 offline document search tool Python
 KnowledgeDigest
 file-bricks knowledgedigest
+desktop document search offline-first
+local-first AI RAG database sqlite
 knowledge base desktop GUI Python
 ```
