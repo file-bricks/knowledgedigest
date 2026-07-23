@@ -1,0 +1,42 @@
+{
+  "schema": "ellmos.module.v2",
+  "id": "KnowledgeDigest",
+  "display_name": "KnowledgeDigest",
+  "category": "knowledge",
+  "kind": "service",
+  "status": "alpha",
+  "visibility": "public-candidate",
+  "provides": [
+    "knowledge.ingest",
+    "knowledge.search",
+    "knowledge.search.default"
+  ],
+  "requires": [],
+  "optional": [],
+  "conflicts": [],
+  "surfaces": [
+    "library",
+    "cli",
+    "service",
+    "ui"
+  ],
+  "state": {
+    "ownership": "module",
+    "location": "user-home"
+  },
+  "boundaries": {
+    "network": "optional",
+    "data": "user-local",
+    "platforms": [
+      "windows",
+      "macos",
+      "linux"
+    ]
+  },
+  "source_of_truth": {
+    "type": "local-directory",
+    "path": ".",
+    "repository": "https://github.com/file-bricks/knowledgedigest"
+  },
+  "adapters": []
+}
